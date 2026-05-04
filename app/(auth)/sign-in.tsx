@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Pressable,
   TextInput,
   View,
@@ -86,173 +87,163 @@ export default function SignInScreen() {
       ]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-        <View style={{ position: "absolute", top: 0, left: 20 }}>
-          <Button label="<-" variant="ghost" onPress={() => router.push("/")} />
-        </View>
-        <View style={{ flex: 1, paddingHorizontal: spacing.xl }}>
-          {/* HEADER */}
-          <View
-            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-          >
-            <View
-              style={{
-                width: 104,
-                height: 104,
-                borderRadius: radii.xxl,
-                overflow: "hidden",
-                marginBottom: spacing.xl,
-                shadowColor: colors.tint.primary,
-                shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: 0.32,
-                shadowRadius: 18,
-                elevation: 10,
-              }}
-            >
-              <LinearGradient
-                colors={
-                  storyRingGradient as unknown as [string, string, string]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={{ margin: 5, flex: 1 }}>
+            <View style={{ position: "absolute", top: 0, left: 20 }}>
+              <Button
+                label="<-"
+                variant="ghost"
+                onPress={() => router.push("/")}
+              />
+            </View>
+            <View style={{ flex: 1, paddingHorizontal: spacing.xl }}>
+              <View
                 style={{
                   flex: 1,
                   alignItems: "center",
                   justifyContent: "center",
+                  marginBottom: 40,
                 }}
               >
-                <Image
-                  source={require("../../assets/images/skillhive.png")}
+                <View
                   style={{
-                    width: 60,
-                    height: 60,
-                    tintColor: colors.text.onTint,
+                    width: 104,
+                    height: 104,
+                    borderRadius: radii.xxl,
+                    overflow: "hidden",
+                    marginBottom: spacing.xl,
+                    shadowColor: colors.tint.primary,
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.32,
+                    shadowRadius: 18,
+                    elevation: 10,
                   }}
-                  contentFit="contain"
+                >
+                  <LinearGradient
+                    colors={
+                      storyRingGradient as unknown as [string, string, string]
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Image
+                      source={require("../../assets/images/skillhive.png")}
+                      style={{
+                        width: 60,
+                        height: 60,
+                        tintColor: colors.text.onTint,
+                      }}
+                      contentFit="contain"
+                    />
+                  </LinearGradient>
+                </View>
+
+                <Text variant="headline" tone="primary" align="center">
+                  Sign in to Skillhive
+                </Text>
+
+                <Text
+                  variant="body"
+                  tone="secondary"
+                  align="center"
+                  style={{ maxWidth: 320, marginTop: spacing.sm }}
+                >
+                  something
+                </Text>
+              </View>
+              <View style={{ gap: 12, marginBottom: spacing.lg }}>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Email"
+                  placeholderTextColor={"#ffffff"}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!emailLoading}
+                  style={{
+                    height: 52,
+                    borderWidth: 1,
+                    borderColor: colors.border.subtle,
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    backgroundColor: colors.surface.primary,
+                    color: colors.text.primary,
+                  }}
                 />
-              </LinearGradient>
-            </View>
 
-            <Text variant="headline" tone="primary" align="center">
-              Sign in to Skillhive
-            </Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password"
+                  placeholderTextColor={"#ffffff"}
+                  secureTextEntry
+                  editable={!emailLoading}
+                  style={{
+                    height: 52,
+                    borderWidth: 1,
+                    borderColor: colors.border.subtle,
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    backgroundColor: colors.surface.primary,
+                    color: colors.text.primary,
+                  }}
+                />
 
-            <Text
-              variant="body"
-              tone="secondary"
-              align="center"
-              style={{ maxWidth: 320, marginTop: spacing.sm }}
-            >
-              something
-            </Text>
-          </View>
-
-          {/* EMAIL / PASSWORD */}
-          <View style={{ gap: 12, marginBottom: spacing.lg }}>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!emailLoading}
-              style={{
-                height: 52,
-                borderWidth: 1,
-                borderColor: colors.border.subtle,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                backgroundColor: colors.surface.primary,
-                color: colors.text.primary,
-              }}
-            />
-
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              secureTextEntry
-              editable={!emailLoading}
-              style={{
-                height: 52,
-                borderWidth: 1,
-                borderColor: colors.border.subtle,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                backgroundColor: colors.surface.primary,
-                color: colors.text.primary,
-              }}
-            />
-
-            <ProviderButton
-              label="Sign in with email"
-              icon={require("../../assets/images/skillhive.png")}
-              loading={emailLoading}
-              onPress={handleEmailLogin}
-            />
-          </View>
-
-          {/* DIVIDER */}
-          <View style={{ marginBottom: spacing.lg }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                marginBottom: spacing.md,
-              }}
-            >
-              <View
-                style={{
-                  flex: 1,
-                  height: 1,
-                  backgroundColor: colors.border.subtle,
-                }}
-              />
-              <Text variant="caption" tone="tertiary" weight="600">
-                Continue with
+                <ProviderButton
+                  label="Sign in"
+                  icon={require("../../assets/images/skillhive.png")}
+                  loading={emailLoading}
+                  onPress={handleEmailLogin}
+                />
+              </View>
+              <View style={{ marginBottom: spacing.lg }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.sm,
+                    marginBottom: spacing.md,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 1,
+                      backgroundColor: colors.border.subtle,
+                    }}
+                  />
+                  <Text variant="caption" tone="tertiary" weight="600">
+                    Continue with
+                  </Text>
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 1,
+                      backgroundColor: colors.border.subtle,
+                    }}
+                  />
+                </View>
+              </View>
+              <Text
+                variant="caption"
+                tone="tertiary"
+                align="center"
+                style={{ marginBottom: spacing.lg }}
+              >
+                By continuing you agree to our Terms and Privacy Policy.
               </Text>
-              <View
-                style={{
-                  flex: 1,
-                  height: 1,
-                  backgroundColor: colors.border.subtle,
-                }}
-              />
-            </View>
-
-            <View style={{ gap: spacing.md }}>
-              <ProviderButton
-                label="Continue with Apple"
-                icon={require("../../assets/images/skillhive.png")}
-                loading={socialLoading}
-                onPress={() => press("oauth_apple")}
-              />
-
-              <ProviderButton
-                label="Continue with Google"
-                icon={require("../../assets/images/skillhive.png")}
-                loading={socialLoading}
-                onPress={() => press("oauth_google")}
-              />
             </View>
           </View>
-
-          {/* FOOTER */}
-          <Text
-            variant="caption"
-            tone="tertiary"
-            align="center"
-            style={{ marginBottom: spacing.lg }}
-          >
-            By continuing you agree to our Terms and Privacy Policy.
-          </Text>
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
 }
-
-/* ---------------- BUTTON ---------------- */
 
 interface ProviderButtonProps {
   label: string;

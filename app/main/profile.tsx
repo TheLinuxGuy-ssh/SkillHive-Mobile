@@ -1,4 +1,5 @@
-import { Button } from "@/components/ui/Button";
+import SignOutButton from "@/components/SignOutButton";
+import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
@@ -6,6 +7,7 @@ import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const Profile = () => {
+  const { colors, spacing, radii } = useTheme();
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -31,19 +33,14 @@ const Profile = () => {
     supabase.auth.signOut();
     setUser(null);
   }
-
   return (
-    <View style={{ backgroundColor: "#1f1f1f", flex: 1 }}>
+    <View style={{ backgroundColor: colors.bg.canvas, flex: 1 }}>
       <SafeAreaView>
         <View>
-          <Text style={{ color: "#fff" }}>
+          <Text style={{ color: colors.text.primary }}>
             Hello there {user?.email ?? "Not Logged in"}
           </Text>
-          <Button
-            label="Logout"
-            style={{ display: user ? "flex" : "none" }}
-            onPress={() => logOut()}
-          />
+          <SignOutButton />
         </View>
       </SafeAreaView>
     </View>

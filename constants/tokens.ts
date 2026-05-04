@@ -225,7 +225,7 @@ export const lightPalette: ColorPalette = {
 
 export const darkPalette: ColorPalette = {
   bg: {
-    canvas: "#000000",
+    canvas: "#1f1f1f",
     elevated: "#0E0E12",
     muted: "#15151B",
   },

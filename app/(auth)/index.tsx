@@ -6,6 +6,9 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
 import { Pressable, View } from "react-native";
 
+import { Text } from "@/components/ui/Text";
+import { storyRingGradient } from "@/constants/tokens";
+import { useTheme } from "@/hooks/useTheme";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -16,10 +19,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { Text } from "@/components/ui/Text";
-import { storyRingGradient } from "@/constants/tokens";
-import { useTheme } from "@/hooks/useTheme";
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -37,7 +36,7 @@ export default function WelcomeScreen() {
       -1,
       true,
     );
-    // Slower counter-loop on the back layer for the parallax effect.
+
     drift.value = withRepeat(
       withTiming(1, { duration: 4800, easing: Easing.inOut(Easing.sin) }),
       -1,
@@ -50,7 +49,6 @@ export default function WelcomeScreen() {
     );
   }, [drift, fade, float, rise]);
 
-  // Foreground hero — moves more.
   const heroStyle = useAnimatedStyle(() => ({
     transform: [
       { translateY: -float.value * 10 },
@@ -58,8 +56,6 @@ export default function WelcomeScreen() {
     ],
   }));
 
-  // Background glow halo — moves less, opposite direction. The two
-  // layers together produce a parallax depth cue without any 3D math.
   const haloStyle = useAnimatedStyle(() => ({
     opacity: 0.32 + drift.value * 0.16,
     transform: [
@@ -124,8 +120,6 @@ export default function WelcomeScreen() {
               position: "relative",
             }}
           >
-            {/* Halo backdrop — gradient sweep behind the hero so the
-                first thing the user sees carries the brand signature. */}
             <Animated.View
               pointerEvents="none"
               style={[
