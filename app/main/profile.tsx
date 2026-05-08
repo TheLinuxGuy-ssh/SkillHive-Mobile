@@ -1,4 +1,6 @@
 import CustomAlert from "@/components/CustomAlert";
+import StatCard from "@/components/ui/StatCard";
+import { useProfile } from "@/hooks/profileContext";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
@@ -14,11 +16,13 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/FontAwesome6";
 
 const Profile = () => {
   const { colors } = useTheme();
+  const { profile, loading, error, updateField } = useProfile();
   const [user, setUser] = useState<User | null>(null);
 
   const { handleSignOut, isSigningOut, alertConfig, isVisible, hideAlert } =
@@ -43,41 +47,6 @@ const Profile = () => {
     };
   }, []);
 
-  const StatCard = ({
-    icon,
-    value,
-    label,
-  }: {
-    icon: string;
-    value: string;
-    label: string;
-  }) => (
-    <View
-      style={[
-        styles.statCard,
-        {
-          backgroundColor: colors.surface.secondary,
-          borderColor: colors.border.subtle,
-          position: "relative",
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.iconWrap,
-          { backgroundColor: "rgba(255, 253, 1, 0.15)" },
-        ]}
-      >
-        <Icon name={icon} size={14} color={colors.tint.primary} solid />
-      </View>
-      <Text style={[styles.statLabel, { color: colors.text.secondary }]}>
-        {label}
-      </Text>
-      <Text style={[styles.statValue, { color: colors.text.primary }]}>
-        {value}
-      </Text>
-    </View>
-  );
   const router = useRouter();
   return (
     <View
@@ -109,36 +78,21 @@ const Profile = () => {
                     backgroundColor: colors.surface.primary,
                   },
                 ]}
-              >
-                <Icon
-                  name="chevron-left"
-                  size={14}
-                  color={colors.text.primary}
-                />
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.headerButton,
-                  {
-                    backgroundColor: colors.surface.primary,
-                  },
-                ]}
-                onPress={() => router.push("/settings")}
+                onPress={() => router.push("../settings")}
               >
                 <Icon name="gear" size={14} color={colors.text.primary} solid />
               </Pressable>
             </View>
           </View>
 
-          {/* PROFILE CARD */}
-          <View
+          <Animated.View
             style={[
               styles.profileCard,
               {
                 backgroundColor: colors.surface.primary,
               },
             ]}
+            entering={FadeInUp.duration(200).delay(100)}
           >
             <View style={styles.profileTop}>
               <Image
@@ -168,18 +122,30 @@ const Profile = () => {
                 </Text>
               </Pressable>
             </View>
-
-            <Text
-              style={[
-                styles.name,
-                {
-                  color: colors.text.primary,
-                },
-              ]}
+            <View
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
             >
-              {user?.email?.split("@")[0] ?? "Guest"}
-            </Text>
-
+              <Text
+                style={[
+                  styles.name,
+                  {
+                    color: colors.text.primary,
+                  },
+                ]}
+              >
+                {profile?.displayname}
+              </Text>
+              <Text
+                style={{ color: colors.text.secondary, marginHorizontal: 10 }}
+              >
+                [{profile?.username}]=
+              </Text>
+            </View>
             <Text
               style={[
                 styles.email,
@@ -188,7 +154,7 @@ const Profile = () => {
                 },
               ]}
             >
-              {user?.email ?? "guest@email.com"}
+              {profile?.bio ?? "guest@email.com"}
             </Text>
 
             {/* STATS ROW */}
@@ -197,7 +163,7 @@ const Profile = () => {
                 <Text
                   style={[styles.socialNumber, { color: colors.text.primary }]}
                 >
-                  1.5K
+                  {profile?.followers}
                 </Text>
 
                 <Text
@@ -211,7 +177,7 @@ const Profile = () => {
                 <Text
                   style={[styles.socialNumber, { color: colors.text.primary }]}
                 >
-                  320
+                  {profile?.following}
                 </Text>
 
                 <Text
@@ -339,7 +305,7 @@ const Profile = () => {
                 </Pressable>
               </View>
             </View>
-          </View>
+          </Animated.View>
         </ScrollView>
 
         {alertConfig ? (
@@ -370,7 +336,7 @@ const styles = StyleSheet.create({
 
   headerTop: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
 
@@ -457,36 +423,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 14,
     marginBottom: 24,
-  },
-
-  statCard: {
-    width: "47%",
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    minHeight: 85,
-    justifyContent: "space-between",
-  },
-
-  iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    position: "absolute",
-    right: 10,
-    top: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  statValue: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
   },
 
   actionsCard: {

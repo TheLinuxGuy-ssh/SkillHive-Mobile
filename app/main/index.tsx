@@ -1,4 +1,5 @@
 import { Text } from "@/components/ui/Text";
+import { WorkRoomCard } from "@/components/ui/WorkRoomCard";
 import { useTheme } from "@/hooks/useTheme";
 import { Image } from "expo-image";
 import React, { useRef } from "react";
@@ -103,6 +104,7 @@ const Index = () => {
         contentContainerStyle={{
           paddingTop: HEADER_HEIGHT,
           alignItems: "center",
+          marginHorizontal: 5,
         }}
         onContentSizeChange={(_, h) => {
           contentHeight.current = h;
@@ -111,6 +113,7 @@ const Index = () => {
           marginVertical: 10,
           marginHorizontal: 10,
           overflow: "visible",
+          flex: 1,
         }}
         onScroll={onScroll}
         onScrollEndDrag={snapHeader}
@@ -119,6 +122,14 @@ const Index = () => {
         scrollEventThrottle={16}
         bounces={true}
       >
+        <WorkRoomCard
+          state="active"
+          name="React & Frontend"
+          tag="Web Dev"
+          members={["Arjun K", "Rohit S", "Priya R"]}
+          timerSeconds={1122}
+          onJoin={() => {}}
+        />
         <View style={{ height: 2000, width: "100%" }} />
       </Animated.ScrollView>
     </View>
