@@ -1,24 +1,21 @@
 import CustomAlert from "@/components/CustomAlert";
+import MenuItem from "@/components/ui/MenuItem";
+import ProfileImageEditButton from "@/components/ui/ProfileImageEditButton";
+import ProfileProjects from "@/components/ui/ProfileProjects";
+import ProfileStatItem from "@/components/ui/ProfileStatItem";
 import StatCard from "@/components/ui/StatCard";
 import { useProfile } from "@/hooks/profileContext";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { ImageBackground } from "expo-image";
 import { useRouter } from "expo-router";
 
 import { useEffect, useState } from "react";
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/FontAwesome6";
 
 const Profile = () => {
   const { colors } = useTheme();
@@ -52,7 +49,7 @@ const Profile = () => {
     <View
       style={{
         flex: 1,
-        backgroundColor: colors.bg.canvas,
+        backgroundColor: colors.bg.muted,
       }}
     >
       <SafeAreaView style={{ flex: 1 }}>
@@ -62,65 +59,38 @@ const Profile = () => {
             paddingBottom: 120,
           }}
         >
-          <View
-            style={[
-              styles.header,
-              {
-                backgroundColor: colors.tint.primary,
-              },
-            ]}
-          >
-            <View style={styles.headerTop}>
-              <Pressable
-                style={[
-                  styles.headerButton,
-                  {
-                    backgroundColor: colors.surface.primary,
-                  },
-                ]}
-                onPress={() => router.push("../settings")}
-              >
-                <Icon name="gear" size={14} color={colors.text.primary} solid />
-              </Pressable>
-            </View>
+          <View style={[styles.header]}>
+            <ImageBackground
+              source={require("@/assets/images/tanjiro.png")}
+              style={{
+                flex: 1,
+              }}
+            />
           </View>
 
           <Animated.View
-            style={[
-              styles.profileCard,
-              {
-                backgroundColor: colors.surface.primary,
-              },
-            ]}
+            style={[styles.profileCard, {}]}
             entering={FadeInUp.duration(200).delay(100)}
           >
             <View style={styles.profileTop}>
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
+              <View
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  justifyContent: "flex-end",
                 }}
-                style={styles.avatar}
-              />
-
-              <Pressable
-                style={[
-                  styles.friendButton,
-                  {
-                    borderColor: colors.tint.primary,
-                  },
-                ]}
               >
-                <Icon name="plus" size={10} color={colors.tint.primary} solid />
-
-                <Text
-                  style={[
-                    styles.friendButtonText,
-                    { color: colors.tint.primary },
-                  ]}
-                >
-                  Friends
-                </Text>
-              </Pressable>
+                <Image
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
+                  }}
+                  style={styles.avatar}
+                />
+                <ProfileImageEditButton
+                  style={{ right: 0, bottom: 0 }}
+                  onPress={() => console.log("profile")}
+                />
+              </View>
             </View>
             <View
               style={{
@@ -143,7 +113,7 @@ const Profile = () => {
               <Text
                 style={{ color: colors.text.secondary, marginHorizontal: 10 }}
               >
-                [{profile?.username}]=
+                [{profile?.username}]
               </Text>
             </View>
             <Text
@@ -157,54 +127,27 @@ const Profile = () => {
               {profile?.bio ?? "guest@email.com"}
             </Text>
 
-            {/* STATS ROW */}
-            <View style={styles.socialStats}>
-              <View>
-                <Text
-                  style={[styles.socialNumber, { color: colors.text.primary }]}
-                >
-                  {profile?.followers}
-                </Text>
+            <View
+              style={[
+                styles.followContainer,
+                {
+                  backgroundColor: colors.surface.secondary,
+                },
+              ]}
+            >
+              <ProfileStatItem
+                value={profile?.followers || 0}
+                label="Allies"
+                showDivider
+              />
 
-                <Text
-                  style={[styles.socialLabel, { color: colors.text.secondary }]}
-                >
-                  Followers
-                </Text>
-              </View>
+              <ProfileStatItem
+                value={profile?.following || 0}
+                label="Allied With"
+                showDivider
+              />
 
-              <View>
-                <Text
-                  style={[styles.socialNumber, { color: colors.text.primary }]}
-                >
-                  {profile?.following}
-                </Text>
-
-                <Text
-                  style={[styles.socialLabel, { color: colors.text.secondary }]}
-                >
-                  Following
-                </Text>
-              </View>
-
-              <Pressable
-                style={[
-                  styles.recordButton,
-                  {
-                    backgroundColor: "rgba(255, 253, 1, 0.15)",
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: colors.tint.primary,
-                    fontWeight: "700",
-                    fontSize: 11,
-                  }}
-                >
-                  Record
-                </Text>
-              </Pressable>
+              <ProfileStatItem value="12" label="Streak" />
             </View>
 
             {/* GRID */}
@@ -221,88 +164,51 @@ const Profile = () => {
             {/* ACTIONS */}
             <View
               style={[
-                styles.actionsCard,
+                styles.menuContainer,
                 {
                   backgroundColor: colors.surface.secondary,
                   borderColor: colors.border.subtle,
                 },
               ]}
             >
+              {profile?.id && <ProfileProjects userId={profile.id} />}
               <Text
                 style={[
-                  styles.actionsTitle,
+                  styles.menuTitle,
                   {
                     color: colors.text.primary,
                   },
                 ]}
               >
-                Actions
+                Preferences
               </Text>
 
-              <View style={{ gap: 18 }}>
-                <Pressable style={styles.actionRow}>
-                  <Icon
-                    name="user"
-                    size={15}
-                    color={colors.text.primary}
-                    solid
-                  />
+              <View style={styles.menuList}>
+                <MenuItem
+                  icon="user"
+                  label="Edit Profile"
+                  onPress={() => router.push("/settings")}
+                />
 
-                  <Text
-                    style={[
-                      styles.actionText,
-                      {
-                        color: colors.text.primary,
-                      },
-                    ]}
-                  >
-                    Edit Profile
-                  </Text>
-                </Pressable>
+                <MenuItem icon="bell" label="Notifications" />
 
-                <Pressable style={styles.actionRow}>
-                  <Icon
-                    name="gear"
-                    size={15}
-                    color={colors.text.primary}
-                    solid
-                  />
+                <MenuItem icon="shield-halved" label="Privacy & Security" />
 
-                  <Text
-                    style={[
-                      styles.actionText,
-                      {
-                        color: colors.text.primary,
-                      },
-                    ]}
-                  >
-                    Settings
-                  </Text>
-                </Pressable>
+                <MenuItem
+                  icon="gear"
+                  label="Settings"
+                  onPress={() => router.push("../settings")}
+                />
 
-                <Pressable
-                  style={styles.actionRow}
+                <MenuItem icon="circle-question" label="Help & Support" />
+
+                <MenuItem
+                  icon="right-from-bracket"
+                  label={isSigningOut ? "Logging out..." : "Logout"}
                   onPress={handleSignOut}
                   disabled={isSigningOut}
-                >
-                  <Icon
-                    name="right-from-bracket"
-                    size={15}
-                    color={colors.tint.danger}
-                    solid
-                  />
-
-                  <Text
-                    style={[
-                      styles.actionText,
-                      {
-                        color: colors.tint.danger,
-                      },
-                    ]}
-                  >
-                    Logout
-                  </Text>
-                </Pressable>
+                  danger
+                />
               </View>
             </View>
           </Animated.View>
@@ -330,7 +236,6 @@ const styles = StyleSheet.create({
     height: 170,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    paddingHorizontal: 20,
     paddingTop: 10,
   },
 
@@ -349,7 +254,7 @@ const styles = StyleSheet.create({
   },
 
   profileCard: {
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginTop: -70,
     borderRadius: 28,
     padding: 20,
@@ -365,6 +270,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 82,
     height: 82,
+    marginHorizontal: 10,
     borderRadius: 41,
   },
 
@@ -446,5 +352,27 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  menuContainer: {
+    borderWidth: 1,
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 22,
+  },
+
+  menuTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 18,
+  },
+
+  menuList: {
+    gap: 14,
+  },
+  followContainer: {
+    flexDirection: "row",
+    borderRadius: 24,
+    paddingVertical: 18,
+    marginBottom: 28,
   },
 });

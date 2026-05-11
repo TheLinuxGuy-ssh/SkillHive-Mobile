@@ -95,7 +95,7 @@ const Settings = () => {
               <Icon name="chevron-left" size={18} color={colors.text.primary} />
             </Pressable>
             <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-              Settings
+              Profile Edit
             </Text>
             <View style={{ width: 40 }} />
           </View>

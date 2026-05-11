@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   peopleBlock: {
     flex: 1,
     flexDirection: "row",
-    alignContent: "center",
+    alignItems: "center",
   },
 
   avatarRow: {
@@ -597,11 +597,9 @@ const styles = StyleSheet.create({
   meta: {
     color: COLORS.muted,
     fontSize: 11,
-    verticalAlign: "middle",
     fontWeight: "500",
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
+    marginHorizontal: 5,
   },
 
   dot: {
