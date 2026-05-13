@@ -2,6 +2,7 @@ import { Text } from "@/components/ui/Text";
 import { WorkRoomCard } from "@/components/ui/WorkRoomCard";
 import { useTheme } from "@/hooks/useTheme";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import React, { useRef } from "react";
 import {
   Animated,
@@ -63,6 +64,7 @@ const Index = () => {
       bounciness: 0,
     }).start();
   };
+  const router = useRouter();
 
   return (
     <View
@@ -122,6 +124,7 @@ const Index = () => {
         scrollEventThrottle={16}
         bounces={true}
       >
+        <Text onPress={() => router.push("../rooms/test")}>this it it</Text>
         <WorkRoomCard
           state="active"
           name="React & Frontend"
