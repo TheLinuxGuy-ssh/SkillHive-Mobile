@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Courses {
   id: number;
@@ -40,25 +39,23 @@ const Learn = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
-      <SafeAreaView style={{ marginHorizontal: 10 }}>
-        <Animated.ScrollView>
-          {courses.map((course) => (
-            <CourseCard
-              key={course.id}
-              title={course.title}
-              instructor="someone"
-              // instructor={course.profiles.displayname}
-              onPress={() => router.push("/course")}
-              description={course.description}
-              progress={23}
-              enrolledCount={312}
-              lessonCount={10}
-              isNew={true}
-              thumbnail={require("@/assets/images/course.jpg")}
-            />
-          ))}
-        </Animated.ScrollView>
-      </SafeAreaView>
+      <Animated.ScrollView style={{ margin: 10 }}>
+        {courses.map((course) => (
+          <CourseCard
+            key={course.id}
+            title={course.title}
+            instructor="someone"
+            // instructor={course.profiles.displayname}
+            onPress={() => router.push("/course")}
+            description={course.description}
+            progress={23}
+            enrolledCount={312}
+            lessonCount={10}
+            isNew={true}
+            thumbnail={require("@/assets/images/course.jpg")}
+          />
+        ))}
+      </Animated.ScrollView>
     </View>
   );
 };

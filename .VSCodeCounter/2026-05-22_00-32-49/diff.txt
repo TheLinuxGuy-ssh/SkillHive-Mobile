@@ -1,0 +1,54 @@
+Date : 2026-05-22 00:32:49
+Directory : /home/anonymous/Documents/Projects/SkillHive-mobile
+Total : 23 files,  1268 codes, -12 comments, 323 blanks, all 1579 lines
+
+Languages
++----------------+------------+------------+------------+------------+------------+
+| language       | files      | code       | comment    | blank      | total      |
++----------------+------------+------------+------------+------------+------------+
+| TypeScript JSX |         19 |      1,165 |        -16 |        310 |      1,459 |
+| TypeScript     |          4 |        103 |          4 |         13 |        120 |
++----------------+------------+------------+------------+------------+------------+
+
+Directories
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                     | files      | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                        |         23 |      1,268 |        -12 |        323 |      1,579 |
+| app                                                                                      |          7 |        333 |        -25 |         57 |        365 |
+| app/main                                                                                 |          6 |       -129 |         -3 |         44 |        -88 |
+| app/rooms                                                                                |          1 |        462 |        -22 |         13 |        453 |
+| components                                                                               |         12 |        832 |          9 |        253 |      1,094 |
+| components/ui                                                                            |         12 |        832 |          9 |        253 |      1,094 |
+| hooks                                                                                    |          4 |        103 |          4 |         13 |        120 |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| filename                                                                                 | language       | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/_layout.tsx                 | TypeScript JSX |         29 |          2 |         13 |         44 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/chat.tsx                    | TypeScript JSX |         -1 |          0 |          0 |         -1 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/feedScreen.tsx              | TypeScript JSX |         70 |          0 |         21 |         91 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/index.tsx                   | TypeScript JSX |       -223 |         -5 |         11 |       -217 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/learn.tsx                   | TypeScript JSX |         -3 |          0 |          0 |         -3 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/main/profile.tsx                 | TypeScript JSX |         -1 |          0 |         -1 |         -2 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/app/rooms/[roomName].tsx             | TypeScript JSX |        462 |        -22 |         13 |        453 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ActionRow.tsx          | TypeScript JSX |        111 |          2 |         28 |        141 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/CohortStrip.tsx        | TypeScript JSX |         76 |          0 |         17 |         93 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/EditFieldModal.tsx     | TypeScript JSX |        -21 |          0 |         -1 |        -22 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/FeedCard.tsx           | TypeScript JSX |         24 |          0 |         10 |         34 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/FloatingSectionNav.tsx | TypeScript JSX |        126 |          2 |         45 |        173 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/GlobalLockedCard.tsx   | TypeScript JSX |         73 |          1 |         27 |        101 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Header.tsx             | TypeScript JSX |         64 |          0 |         10 |         74 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/OfferCard.tsx          | TypeScript JSX |        134 |          3 |         42 |        179 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ProjectCard.tsx        | TypeScript JSX |         66 |          1 |         22 |         89 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/SectionHeader.tsx      | TypeScript JSX |         46 |          0 |         12 |         58 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ShareBar.tsx           | TypeScript JSX |         70 |          0 |         22 |         92 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/StreakCard.tsx         | TypeScript JSX |         63 |          0 |         19 |         82 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/hooks/sessionPhase.ts                | TypeScript     |         39 |          1 |          8 |         48 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useActiveRooms.ts              | TypeScript     |         -7 |         -1 |         -1 |         -9 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useRoomPresence.ts             | TypeScript     |         10 |          1 |         -3 |          8 |
+| /home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useRoomSession.ts              | TypeScript     |         61 |          3 |          9 |         73 |
+| Total                                                                                    |                |      1,268 |        -12 |        323 |      1,579 |
++------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+

@@ -10,13 +10,14 @@ import {
 
 export type Profile = {
   id: string;
-  email: string;
-  username: string;
+  username: string | null;
+  avatar: string | null;
+  bio: string | null;
   displayname: string;
-  bio: string;
-  language: string;
+  created_at: string;
   followers: number;
   following: number;
+  email: string;
 };
 
 type ProfileContextValue = {
@@ -24,7 +25,7 @@ type ProfileContextValue = {
   loading: boolean;
   error: string | null;
   updateField: (
-    key: keyof Omit<Profile, "id">,
+    key: keyof Omit<Profile, "id" | "created_at" | "email">,
     value: string,
   ) => Promise<boolean>;
   reload: () => Promise<void>;
@@ -43,7 +44,6 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     load();
 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      // Only reload on actual sign in/out, not on every token refresh
       if (event === "SIGNED_IN") load();
       if (event === "SIGNED_OUT") {
         setProfile(null);
@@ -86,7 +86,9 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error: fetchErr } = await supabase
       .from("profiles")
-      .select("*")
+      .select(
+        "id, username, avatar, bio, displayname, created_at, followers, following",
+      )
       .eq("id", user.id)
       .single();
 
@@ -99,7 +101,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
         setError(fetchErr.message);
       }
     } else {
-      setProfile({ ...data, email: user.email ?? data.email ?? "" });
+      setProfile({ ...data, email: user.email ?? "" });
     }
 
     setLoading(false);
@@ -108,34 +110,27 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
   const create = async (id: string, email: string) => {
     const { data, error } = await supabase
       .from("profiles")
-      .insert({ id })
-      .select()
+      .insert({ id, displayname: email.split("@")[0] })
+      .select(
+        "id, username, avatar, bio, displayname, created_at, followers, following",
+      )
       .single();
 
     if (!isMounted.current) return;
+
     if (error) {
       setError(error.message);
       return;
     }
+
     setProfile({ ...data, email });
   };
 
   const updateField = async (
-    key: keyof Omit<Profile, "id">,
+    key: keyof Omit<Profile, "id" | "created_at" | "email">,
     value: string,
   ): Promise<boolean> => {
     if (!profile) return false;
-
-    if (key === "email") {
-      const { error } = await supabase.auth.updateUser({ email: value });
-      if (error) {
-        console.error(error.message);
-        return false;
-      }
-      if (isMounted.current)
-        setProfile((prev) => (prev ? { ...prev, email: value } : prev));
-      return true;
-    }
 
     const { error } = await supabase
       .from("profiles")
@@ -148,8 +143,10 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       console.error(error.message);
       return false;
     }
+
     if (isMounted.current)
       setProfile((prev) => (prev ? { ...prev, [key]: value } : prev));
+
     return true;
   };
 

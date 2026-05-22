@@ -53,17 +53,20 @@ export default function RootLayout() {
   if (session === undefined) return <View style={{ flex: 1 }} />;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ProfileProvider>
+    <ProfileProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="main" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="course/[id]" />
           <Stack.Screen name="profile/[id]" />
-          <Stack.Screen name="rooms/[roomName]" />
+          <Stack.Screen
+            name="rooms/[roomName]"
+            options={{ gestureEnabled: false }}
+          />
         </Stack>
-      </ProfileProvider>
-    </GestureHandlerRootView>
+      </GestureHandlerRootView>
+    </ProfileProvider>
   );
 }

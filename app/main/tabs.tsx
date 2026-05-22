@@ -18,7 +18,7 @@ import Icon from "react-native-vector-icons/FontAwesome6";
 const tabs = [
   { name: "index", label: "Home", icon: "house" },
   { name: "learn", label: "Learn", icon: "brain" },
-  { name: "chat", label: "Chat", icon: "comments" },
+  { name: "feed", label: "Feed", icon: "comments" },
   { name: "profile", label: "Profile", icon: "user" },
 ];
 
@@ -144,6 +144,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    borderColor: "#343434",
+    borderWidth: 1,
     flexDirection: "row",
     borderRadius: 30,
     padding: 2,

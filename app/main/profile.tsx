@@ -15,7 +15,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const Profile = () => {
   const { colors } = useTheme();
@@ -49,10 +48,9 @@ const Profile = () => {
     <View
       style={{
         flex: 1,
-        backgroundColor: colors.bg.muted,
       }}
     >
-      <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1, zIndex: 10, backgroundColor: colors.bg.muted }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
@@ -67,7 +65,6 @@ const Profile = () => {
               }}
             />
           </View>
-
           <Animated.View
             style={[styles.profileCard, {}]}
             entering={FadeInUp.duration(200).delay(100)}
@@ -224,7 +221,7 @@ const Profile = () => {
             onDismiss={hideAlert}
           />
         ) : null}
-      </SafeAreaView>
+      </View>
     </View>
   );
 };
@@ -236,7 +233,8 @@ const styles = StyleSheet.create({
     height: 170,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    paddingTop: 10,
+    paddingTop: 0,
+    zIndex: -1,
   },
 
   headerTop: {

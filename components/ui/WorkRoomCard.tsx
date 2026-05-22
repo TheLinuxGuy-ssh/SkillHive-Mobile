@@ -20,8 +20,8 @@ export interface WorkRoomCardProps {
   name: string;
   tag: string;
   members?: string[];
-  timerSeconds?: number;
-  breakSeconds?: number;
+  timerSeconds: number;
+  breakSeconds: number;
   onJoin?: () => void;
   onStart?: () => void;
   style?: ViewStyle;
@@ -285,7 +285,7 @@ const ActiveCard = memo(function ActiveCard({
   name,
   tag,
   members = [],
-  timerSeconds = 1500,
+  timerSeconds,
   onJoin,
   style,
 }: WorkRoomCardProps) {

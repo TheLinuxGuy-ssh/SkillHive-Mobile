@@ -1,5 +1,8 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { Header } from "@/components/ui/Header";
 import { LinkNav } from "./tabs";
 
 const PagerView =
@@ -8,7 +11,7 @@ const PagerView =
         .default as typeof import("react-native-pager-view").default)
     : null;
 
-import ChatScreen from "./chat";
+import feedScreen from "./feedScreen";
 import HomeScreen from "./index";
 import LearnScreen from "./learn";
 import ProfileScreen from "./profile";
@@ -16,13 +19,17 @@ import ProfileScreen from "./profile";
 const ROUTES = [
   { name: "index", title: "Home", component: HomeScreen },
   { name: "learn", title: "Learn", component: LearnScreen },
-  { name: "chat", title: "Chat", component: ChatScreen },
+  { name: "feed", title: "Feed", component: feedScreen },
   { name: "profile", title: "Profile", component: ProfileScreen },
 ] as const;
 
 export default function Layout() {
+  const insets = useSafeAreaInsets();
+
   const pagerRef = useRef<any>(null);
+
   const [activeIndex, setActiveIndex] = useState(0);
+
   const isAnimating = useRef(false);
 
   const onPageSelected = useCallback(
@@ -35,31 +42,45 @@ export default function Layout() {
 
   const handleTabPress = useCallback((routeName: string) => {
     const index = ROUTES.findIndex((r) => r.name === routeName);
+
     if (index === -1 || isAnimating.current) return;
+
     isAnimating.current = true;
+
     pagerRef.current?.setPage(index);
+
     setActiveIndex(index);
   }, []);
 
   const fakeState = {
     index: activeIndex,
-    routes: ROUTES.map((r) => ({ key: r.name, name: r.name })),
+    routes: ROUTES.map((r) => ({
+      key: r.name,
+      name: r.name,
+    })),
   };
 
   const fakeNavigation = {
-    emit: () => ({ defaultPrevented: false }),
+    emit: () => ({
+      defaultPrevented: false,
+    }),
+
     navigate: (name: string) => handleTabPress(name),
   };
 
   const fakeDescriptors = Object.fromEntries(
     ROUTES.map((r) => [
       r.name,
-      { options: { title: r.title }, render: () => null },
+      {
+        options: { title: r.title },
+        render: () => null,
+      },
     ]),
   );
 
   const pages = ROUTES.map((route) => {
     const Screen = route.component;
+
     return (
       <View key={route.name} style={styles.page}>
         <Screen />
@@ -69,34 +90,57 @@ export default function Layout() {
 
   return (
     <View style={styles.container}>
-      {PagerView ? (
-        <PagerView
-          ref={pagerRef}
-          style={styles.pager}
-          initialPage={0}
-          onPageSelected={onPageSelected}
-          overdrag={false}
-          offscreenPageLimit={ROUTES.length - 1}
-        >
-          {pages}
-        </PagerView>
-      ) : (
-        // Web — just show the active screen, no swipe needed
-        <View style={styles.pager}>{pages[activeIndex]}</View>
-      )}
+      {/* Global Header */}
+      <Header />
 
+      {/* Pages */}
+      <View
+        style={{
+          flex: 1,
+        }}
+      >
+        {PagerView ? (
+          <PagerView
+            ref={pagerRef}
+            style={styles.pager}
+            initialPage={0}
+            onPageSelected={onPageSelected}
+            overdrag={false}
+            offscreenPageLimit={ROUTES.length - 1}
+          >
+            {pages}
+          </PagerView>
+        ) : (
+          <View style={styles.pager}>{pages[activeIndex]}</View>
+        )}
+      </View>
+
+      {/* Bottom Tabs */}
       <LinkNav
         state={fakeState as any}
         navigation={fakeNavigation as any}
         descriptors={fakeDescriptors as any}
-        insets={{ bottom: 0, left: 0, right: 0, top: 0 }}
+        insets={{
+          bottom: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  pager: { flex: 1 },
-  page: { flex: 1 },
+  container: {
+    flex: 1,
+  },
+
+  pager: {
+    flex: 1,
+  },
+
+  page: {
+    flex: 1,
+  },
 });

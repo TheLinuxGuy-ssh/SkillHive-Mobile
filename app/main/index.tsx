@@ -1,36 +1,62 @@
+import EditFieldModal from "@/components/ui/EditFieldModal";
 import { Text } from "@/components/ui/Text";
 import { WorkRoomCard } from "@/components/ui/WorkRoomCard";
+import { computePhase } from "@/hooks/sessionPhase";
+import { useActiveRooms } from "@/hooks/useActiveRooms";
 import { useTheme } from "@/hooks/useTheme";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const LOGO_SIZE = 50;
 
+// ─── Index ──────────────────────────────────────────────────────────────────
+
 const Index = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
   const HEADER_HEIGHT = LOGO_SIZE + insets.top + 20;
 
+  const { rooms, loading } = useActiveRooms();
+
+  // Room name state
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [roomName, setRoomName] = useState("");
+
   const scrollY = useRef(new Animated.Value(0)).current;
+
   const translateY = useRef(new Animated.Value(0)).current;
+  const translateYValue = useRef(0);
 
   const lastScrollY = useRef(0);
   const contentHeight = useRef(0);
   const containerHeight = useRef(0);
 
-  const isWithinBounds = (y: number) => {
-    return y >= 0 && y <= contentHeight.current - containerHeight.current;
-  };
+  // Safely track animated value
+  useEffect(() => {
+    const id = translateY.addListener(({ value }) => {
+      translateYValue.current = value;
+    });
+
+    return () => {
+      translateY.removeListener(id);
+    };
+  }, [translateY]);
+
+  const isWithinBounds = (y: number) =>
+    y >= 0 && y <= contentHeight.current - containerHeight.current;
 
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -43,129 +69,249 @@ const Index = () => {
 
         const diff = currentY - lastScrollY.current;
 
-        let next = (translateY as any)._value - diff;
+        let next = translateYValue.current - diff;
 
-        if (next < -HEADER_HEIGHT) next = -HEADER_HEIGHT;
-        if (next > 0) next = 0;
+        if (next < -HEADER_HEIGHT) {
+          next = -HEADER_HEIGHT;
+        }
+
+        if (next > 0) {
+          next = 0;
+        }
 
         translateY.setValue(next);
+
         lastScrollY.current = currentY;
       },
     },
   );
 
   const snapHeader = () => {
-    const current = (translateY as any)._value;
-    const shouldShow = current > -HEADER_HEIGHT / 2;
+    const current = translateYValue.current;
 
     Animated.spring(translateY, {
-      toValue: shouldShow ? 0 : -HEADER_HEIGHT,
+      toValue: current > -HEADER_HEIGHT / 2 ? 0 : -HEADER_HEIGHT,
       useNativeDriver: true,
       bounciness: 0,
     }).start();
   };
-  const router = useRouter();
+
+  function handleOpenSheet() {
+    setRoomName("");
+    setSheetVisible(true);
+  }
+
+  function handleCloseSheet() {
+    setSheetVisible(false);
+    setRoomName("");
+  }
+
+  function handleStartSession() {
+    const trimmed = roomName.trim();
+
+    if (!trimmed) return;
+
+    setSheetVisible(false);
+    setRoomName("");
+
+    router.push({
+      pathname: "/rooms/[roomName]",
+      params: { roomName: trimmed },
+    });
+  }
+
+  function handleJoinRoom(name: string) {
+    router.push({
+      pathname: "/rooms/[roomName]",
+      params: { roomName: name },
+    });
+  }
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: colors.bg.muted }}
+      style={{
+        flex: 1,
+        backgroundColor: colors.bg.muted,
+      }}
       onLayout={(e: LayoutChangeEvent) => {
         containerHeight.current = e.nativeEvent.layout.height;
       }}
     >
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            height: HEADER_HEIGHT,
-            backgroundColor: colors.bg.elevated,
-            transform: [{ translateY }],
-            paddingTop: insets.top,
-          },
-        ]}
-      >
-        <View style={styles.logoContainer}>
-          <Text
-            variant="title"
-            style={{
-              color: colors.text.skillhive,
-              paddingHorizontal: 20,
-              fontSize: 25,
-            }}
-          >
-            SkillHive
-          </Text>
-          <Image
-            source={require("@/assets/images/skillhive.png")}
-            style={[styles.logo, { marginHorizontal: 20 }]}
-          />
-        </View>
-      </Animated.View>
-
       <Animated.ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: HEADER_HEIGHT,
-          alignItems: "center",
-          marginHorizontal: 5,
+          padding: 10,
+          paddingHorizontal: 14,
+          gap: 12,
         }}
         onContentSizeChange={(_, h) => {
           contentHeight.current = h;
         }}
-        style={{
-          marginVertical: 10,
-          marginHorizontal: 10,
-          overflow: "visible",
-          flex: 1,
-        }}
         onScroll={onScroll}
         onScrollEndDrag={snapHeader}
-        showsVerticalScrollIndicator={false}
         onMomentumScrollEnd={snapHeader}
+        showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        bounces={true}
+        bounces
       >
-        <Text onPress={() => router.push("../rooms/test")}>this it it</Text>
-        <WorkRoomCard
-          state="active"
-          name="React & Frontend"
-          tag="Web Dev"
-          members={["Arjun K", "Rohit S", "Priya R"]}
-          timerSeconds={1122}
-          onJoin={() => {}}
-        />
-        <View style={{ height: 2000, width: "100%" }} />
+        {/* Section header */}
+        <View style={styles.sectionHeader}>
+          <Text
+            variant="subtitle"
+            style={{
+              color: colors.text.primary,
+            }}
+          >
+            Work Rooms
+          </Text>
+
+          <View style={styles.sectionRight}>
+            {rooms.length > 0 && (
+              <View
+                style={[
+                  styles.countChip,
+                  {
+                    backgroundColor: colors.surface.skillhive + "22",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.countText,
+                    {
+                      color: colors.text.skillhive,
+                    },
+                  ]}
+                >
+                  {rooms.length} live
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.createBtn,
+                {
+                  backgroundColor: colors.surface.skillhive,
+                  borderColor: colors.border.primary,
+                },
+              ]}
+              onPress={handleOpenSheet}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.createBtnText}>+ New Room</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Loading */}
+        {loading && (
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.text.skillhive} />
+          </View>
+        )}
+
+        {/* Empty state */}
+        {!loading && rooms.length === 0 && (
+          <WorkRoomCard
+            state="empty"
+            name="No rooms yet"
+            tag="Be the first"
+            onStart={handleOpenSheet}
+            timerSeconds={0}
+            breakSeconds={0}
+          />
+        )}
+
+        {/* Live rooms */}
+        {!loading &&
+          rooms.map((room) => {
+            const phase = computePhase(room.session_started_at);
+            const memberNames = room.participants.map(
+              (p) => p.displayname || p.username,
+            );
+
+            return (
+              <WorkRoomCard
+                key={room.room_name}
+                state={
+                  phase.phase === "focus"
+                    ? "active"
+                    : phase.phase === "break"
+                      ? "break"
+                      : "empty"
+                }
+                name={room.room_name}
+                tag={`${room.participant_count} joined`}
+                members={memberNames}
+                timerSeconds={
+                  phase.phase === "focus" ? phase.remainingSeconds : 0
+                }
+                breakSeconds={
+                  phase.phase === "break" ? phase.remainingSeconds : 0
+                }
+                onJoin={() => handleJoinRoom(room.room_name)}
+              />
+            );
+          })}
       </Animated.ScrollView>
+
+      {/* Create room sheet */}
+      <EditFieldModal
+        visible={sheetVisible}
+        titlePlaceholder=""
+        title="Room Name"
+        btnText="Create"
+        value={roomName}
+        onChange={setRoomName}
+        onClose={handleCloseSheet}
+        onSave={handleStartSession}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "rgba(0,0,0,0.1)",
-  },
-  logoContainer: {
-    // backgroundColor: "#ffffff",
-    flex: 1,
-    alignItems: "center",
-    width: "100%",
-    justifyContent: "space-between",
+  sectionHeader: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  logo: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-    borderRadius: LOGO_SIZE / 2,
+
+  sectionRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  countChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+
+  countText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  createBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#fffd01",
+  },
+
+  createBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#000000",
+  },
+
+  centered: {
+    paddingVertical: 48,
+    alignItems: "center",
   },
 });
 

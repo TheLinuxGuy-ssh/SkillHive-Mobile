@@ -15,8 +15,10 @@ import Animated, {
 
 type Props = {
   visible: boolean;
+  titlePlaceholder?: string;
   title: string;
   value: string;
+  btnText?: string;
   onChange: (text: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -30,8 +32,10 @@ const DISMISS_VELOCITY = 700;
 const EditFieldModal = ({
   visible,
   title,
+  titlePlaceholder,
   value,
   onChange,
+  btnText,
   onClose,
   onSave,
   saving,
@@ -137,7 +141,7 @@ const EditFieldModal = ({
               marginBottom: 18,
             }}
           >
-            Edit {title}
+            {titlePlaceholder ?? "Edit"} {title}
           </Text>
 
           {/* INPUT */}
@@ -170,32 +174,6 @@ const EditFieldModal = ({
           {/* BUTTONS */}
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Pressable
-              onPress={onClose}
-              style={({ pressed }) => ({
-                flex: 1,
-                height: 54,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: colors.border.subtle,
-                backgroundColor: pressed
-                  ? colors.surface.secondary
-                  : "transparent",
-                justifyContent: "center",
-                alignItems: "center",
-              })}
-            >
-              <Text
-                style={{
-                  color: colors.text.secondary,
-                  fontWeight: "600",
-                  fontSize: 15,
-                }}
-              >
-                Cancel
-              </Text>
-            </Pressable>
-
-            <Pressable
               onPress={onSave}
               disabled={saving}
               style={({ pressed }) => ({
@@ -217,7 +195,7 @@ const EditFieldModal = ({
                   fontSize: 15,
                 }}
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? "Saving..." : (btnText ?? "Save Changes")}
               </Text>
             </Pressable>
           </View>

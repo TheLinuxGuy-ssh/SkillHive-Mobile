@@ -1,8 +1,14 @@
 import { useProfile } from "@/hooks/profileContext";
+import { useRoomPresence } from "@/hooks/useRoomPresence";
+import { useRoomSession } from "@/hooks/useRoomSession";
+import { useTheme } from "@/hooks/useTheme";
+import { supabase } from "@/lib/supabase";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import {
   LiveKitRoom,
   registerGlobals,
   TrackReference,
+  useLocalParticipant,
   useTracks,
   VideoTrack,
 } from "@livekit/react-native";
@@ -15,13 +21,20 @@ import {
   Track,
   VideoPresets,
 } from "livekit-client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
+  Modal,
   PanResponder,
   PermissionsAndroid,
   Platform,
@@ -35,103 +48,213 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTE: Replace the Unicode icon characters below with your icon library.
-// e.g. import { Feather } from "@expo/vector-icons";
-// A helper component is included at the bottom of the file.
-// ─────────────────────────────────────────────────────────────────────────────
-
 registerGlobals();
 
 const LIVEKIT_URL = "ws://192.168.1.50:7880";
 const TOKEN_ENDPOINT = "http://192.168.1.50:3000/getToken";
-const { width: SCREEN_W } = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const SIDEBAR_W = Math.min(300, SCREEN_W * 0.78);
-
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#0d0e11",
-  surface: "#16181e",
-  surfaceHigh: "#1d2029",
-  border: "#262932",
-  borderFaint: "#1c1f27",
-  accent: "#4f78f1",
-  accentDim: "rgba(79,120,241,0.14)",
-  green: "#34d399",
-  greenDim: "rgba(52,211,153,0.14)",
-  red: "#f36060",
-  redDim: "rgba(243,96,96,0.12)",
-  text: "#f0f2f8",
-  textMid: "#9299b0",
-  textDim: "#555d75",
-};
-
 const MONO = Platform.OS === "ios" ? "Menlo" : "monospace";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getResolutionPreset(count: number) {
-  if (count <= 3) return VideoPresets.h720;
-  if (count <= 6) return VideoPresets.h480;
-  return VideoPresets.h360;
+type CubicleState =
+  | { status: "idle" }
+  | { status: "requesting"; targetIdentity: string }
+  | { status: "incoming"; fromIdentity: string; cubicleRoomName: string }
+  | { status: "active"; partnerIdentity: string; cubicleRoomName: string };
+
+const PREFERRED_LAYOUTS: Record<number, { cols: number }> = {
+  1: { cols: 1 },
+  2: { cols: 1 },
+  3: { cols: 2 },
+  4: { cols: 2 },
+  5: { cols: 3 },
+  6: { cols: 3 },
+};
+
+type GridLayout = {
+  type: "single" | "grid" | "asymmetric";
+  cols: number;
+  rows: number;
+  tileW: number;
+  tileH: number;
+};
+
+function computeGrid(
+  count: number,
+  containerW: number,
+  containerH: number,
+): GridLayout {
+  if (count === 0) {
+    return {
+      type: "single",
+      cols: 1,
+      rows: 1,
+      tileW: containerW,
+      tileH: containerH,
+    };
+  }
+  if (count === 1) {
+    return {
+      type: "single",
+      cols: 1,
+      rows: 1,
+      tileW: containerW,
+      tileH: containerH,
+    };
+  }
+  if (count === 2) {
+    return {
+      type: "grid",
+      cols: 1,
+      rows: 2,
+      tileW: containerW,
+      tileH: containerH / 2,
+    };
+  }
+  if (count === 3) {
+    return {
+      type: "asymmetric",
+      cols: 2,
+      rows: 2,
+      tileW: containerW / 2,
+      tileH: containerH / 2,
+    };
+  }
+  if (count === 4) {
+    return {
+      type: "grid",
+      cols: 2,
+      rows: 2,
+      tileW: containerW / 2,
+      tileH: containerH / 2,
+    };
+  }
+  if (count === 5) {
+    return {
+      type: "asymmetric",
+      cols: 3,
+      rows: 2,
+      tileW: containerW / 3,
+      tileH: containerH / 2,
+    };
+  }
+  if (count === 6) {
+    return {
+      type: "grid",
+      cols: 2,
+      rows: 3,
+      tileW: containerW / 2,
+      tileH: containerH / 3,
+    };
+  }
+  return {
+    type: "grid",
+    cols: 2,
+    rows: 3,
+    tileW: containerW / 2,
+    tileH: containerH / 3,
+  };
 }
+
+const TILES_PER_PAGE = 6;
+
 function getResolutionLabel(count: number) {
-  if (count <= 3) return "720p";
-  if (count <= 6) return "480p";
-  return "360p";
+  if (count <= 2) return "720p";
+  if (count <= 6) return "360p";
+  return "180p";
 }
-function getGridColumns(count: number) {
-  if (count === 1) return 1;
-  if (count <= 4) return 2;
-  return 3;
-}
+
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-// ─── Audio device hook ────────────────────────────────────────────────────────
-// Replace the static list with your platform audio-session library of choice
-// (e.g. react-native-audio-session, react-native-incall-manager, etc.)
 interface AudioDevice {
   id: string;
   name: string;
 }
 
 function useAudioDevices() {
-  // Static demo list — swap with real device enumeration in production
   const [devices] = useState<AudioDevice[]>([
     { id: "speaker", name: "Speaker" },
     { id: "earpiece", name: "Earpiece" },
   ]);
   const [activeId, setActiveId] = useState("speaker");
-
   function selectDevice(id: string) {
-    // TODO: call your audio-session library here
     setActiveId(id);
   }
-
   const active = devices.find((d) => d.id === activeId) ?? devices[0];
   return { devices, active, selectDevice };
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
 export default function RoomScreen() {
   const { roomName } = useLocalSearchParams<{ roomName: string }>();
   const { profile } = useProfile();
   const router = useRouter();
+  const { colors } = useTheme();
+
+  useRoomPresence(roomName, () => {
+    Alert.alert("Couldn't join room", "Please try again.", [
+      {
+        text: "OK",
+        onPress: () => {
+          setTimeout(() => {
+            if (router.canGoBack()) router.back();
+            else router.replace("/main");
+          }, 100);
+        },
+      },
+    ]);
+  });
+
+  // ── Session timer & mic gate ──────────────────────────────────────────
+  const { phaseState } = useRoomSession(roomName ?? "");
 
   const [token, setToken] = useState<string | null>(null);
+  const [livekitReady, setLivekitReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [micEnabled, setMicEnabled] = useState(true);
+
+  const [micEnabled, setMicEnabled] = useState(false);
   const [camEnabled, setCamEnabled] = useState(true);
+  const micEnabledRef = useRef(true);
+  const camEnabledRef = useRef(true);
+
   const [isFrontCam, setIsFrontCam] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [focusedIdentity, setFocusedIdentity] = useState<string | null>(null);
+  const [camOffSet, setCamOffSet] = useState<Set<string>>(new Set());
+
+  const [cubicle, setCubicle] = useState<CubicleState>({ status: "idle" });
+  const [cubicleToken, setCubicleToken] = useState<string | null>(null);
+  const cubicleJoinCancelledRef = useRef(false);
+  const cubicleRoomRef = useRef<Room | null>(null);
+  const cubicleChannelRef = useRef<any>(null);
+  const [cubicleSet, setCubicleSet] = useState<Set<string>>(new Set());
 
   const sidebarX = useRef(new Animated.Value(SIDEBAR_W)).current;
   const sidebarOpacity = useRef(new Animated.Value(0)).current;
   const roomRef = useRef<Room | null>(null);
   const sidebarOpenRef = useRef(false);
   const { devices, active: activeDevice, selectDevice } = useAudioDevices();
+  const [gridSize, setGridSize] = useState({ w: SCREEN_W, h: SCREEN_H * 0.72 });
+
+  const syncRef = useRef<(() => void) | null>(null);
+
+  const cubicleRef = useRef<CubicleState>({ status: "idle" });
+  useEffect(() => {
+    cubicleRef.current = cubicle;
+  }, [cubicle]);
+
+  // ── Auto-mute when focus phase resumes after a break ─────────────────
+  const prevPhaseRef = useRef<string>(phaseState.phase);
+  useEffect(() => {
+    if (prevPhaseRef.current === "break" && phaseState.phase === "focus") {
+      roomRef.current?.localParticipant.setMicrophoneEnabled(false);
+      micEnabledRef.current = false;
+      setMicEnabled(false);
+    }
+    prevPhaseRef.current = phaseState.phase;
+  }, [phaseState.phase]);
 
   const EDGE_HIT_SLOP = 28;
   const SWIPE_THRESHOLD = 40;
@@ -219,6 +342,7 @@ export default function RoomScreen() {
     try {
       await requestPermissions();
       await fetchToken();
+      setLivekitReady(true);
     } catch (e: any) {
       Alert.alert("Setup error", e.message);
     } finally {
@@ -240,8 +364,13 @@ export default function RoomScreen() {
   }
 
   async function fetchToken() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("No active session");
     const res = await fetch(
       `${TOKEN_ENDPOINT}?room=${roomName}&username=${profile?.username}`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } },
     );
     if (!res.ok) throw new Error(`Token server error: ${res.status}`);
     const data = await res.json();
@@ -249,68 +378,319 @@ export default function RoomScreen() {
     setToken(data.token);
   }
 
-  const participantCount = participants.length;
-  const resPreset = getResolutionPreset(participantCount);
+  async function fetchCubicleToken(cubicleRoomName: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("No active session");
+    const res = await fetch(
+      `${TOKEN_ENDPOINT}?room=${cubicleRoomName}&username=${profile?.username}`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } },
+    );
+    if (!res.ok) throw new Error(`Cubicle token error: ${res.status}`);
+    const data = await res.json();
+    if (!data.token) throw new Error("No cubicle token received");
+    return data.token as string;
+  }
+
+  useEffect(() => {
+    if (!roomName || !profile?.username) return;
+
+    const channel = supabase.channel(`cubicle-signals:${roomName}`);
+
+    channel.on("broadcast", { event: "cubicle-request" }, ({ payload }) => {
+      if (payload.targetIdentity !== profile.username) return;
+      if (cubicleRef.current.status !== "idle") return;
+      setCubicle({
+        status: "incoming",
+        fromIdentity: payload.fromIdentity,
+        cubicleRoomName: payload.cubicleRoomName,
+      });
+    });
+
+    channel.on("broadcast", { event: "cubicle-accept" }, ({ payload }) => {
+      if (payload.targetIdentity !== profile.username) return;
+      if (cubicleRef.current.status !== "requesting") return;
+      joinCubicleRoom(payload.cubicleRoomName, payload.fromIdentity);
+    });
+
+    channel.on("broadcast", { event: "cubicle-decline" }, ({ payload }) => {
+      if (payload.targetIdentity !== profile.username) return;
+      cubicleJoinCancelledRef.current = true;
+      setCubicle({ status: "idle" });
+      Alert.alert(
+        "Cubicle declined",
+        `${payload.fromIdentity} declined your request.`,
+      );
+    });
+
+    channel.on("broadcast", { event: "cubicle-end" }, ({ payload }) => {
+      if (payload.targetIdentity !== profile.username) return;
+      endCubicleLocal(payload.fromIdentity);
+    });
+
+    channel.subscribe();
+    cubicleChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      cubicleChannelRef.current = null;
+    };
+  }, [roomName, profile?.username]);
+
+  async function sendCubicleRequest(targetIdentity: string) {
+    if (!profile?.username) return;
+    if (cubicleRef.current.status !== "idle") {
+      Alert.alert("Already in a cubicle", "End your current cubicle first.");
+      return;
+    }
+    const cubicleRoomName = `cubicle-${[profile.username, targetIdentity].sort().join("-")}-${Date.now()}`;
+    cubicleJoinCancelledRef.current = false;
+    setCubicle({ status: "requesting", targetIdentity });
+    setCubicleSet((prev) =>
+      new Set(prev).add(profile.username!).add(targetIdentity),
+    );
+    await cubicleChannelRef.current?.send({
+      type: "broadcast",
+      event: "cubicle-request",
+      payload: {
+        fromIdentity: profile.username,
+        targetIdentity,
+        cubicleRoomName,
+      },
+    });
+  }
+
+  async function acceptCubicle() {
+    const current = cubicleRef.current;
+    if (current.status !== "incoming") return;
+    const { fromIdentity, cubicleRoomName } = current;
+    cubicleJoinCancelledRef.current = false;
+    await cubicleChannelRef.current?.send({
+      type: "broadcast",
+      event: "cubicle-accept",
+      payload: {
+        fromIdentity: profile?.username,
+        targetIdentity: fromIdentity,
+        cubicleRoomName,
+      },
+    });
+    joinCubicleRoom(cubicleRoomName, fromIdentity);
+  }
+
+  async function declineCubicle() {
+    const current = cubicleRef.current;
+    if (current.status !== "incoming") return;
+    const { fromIdentity } = current;
+    cubicleJoinCancelledRef.current = true;
+    await cubicleChannelRef.current?.send({
+      type: "broadcast",
+      event: "cubicle-decline",
+      payload: {
+        fromIdentity: profile?.username,
+        targetIdentity: fromIdentity,
+      },
+    });
+    setCubicle({ status: "idle" });
+    setCubicleSet((prev) => {
+      const s = new Set(prev);
+      s.delete(profile?.username ?? "");
+      s.delete(fromIdentity);
+      return s;
+    });
+  }
+
+  async function joinCubicleRoom(
+    cubicleRoomName: string,
+    partnerIdentity: string,
+  ) {
+    try {
+      await roomRef.current?.localParticipant.setMicrophoneEnabled(false);
+      await roomRef.current?.localParticipant.setCameraEnabled(false);
+
+      const cToken = await fetchCubicleToken(cubicleRoomName);
+
+      if (cubicleJoinCancelledRef.current) {
+        await roomRef.current?.localParticipant.setMicrophoneEnabled(
+          micEnabledRef.current,
+        );
+        await roomRef.current?.localParticipant.setCameraEnabled(
+          camEnabledRef.current,
+        );
+        return;
+      }
+
+      setCubicleToken(cToken);
+      setCubicle({ status: "active", partnerIdentity, cubicleRoomName });
+      setCubicleSet((prev) =>
+        new Set(prev).add(profile?.username ?? "").add(partnerIdentity),
+      );
+    } catch (e: any) {
+      Alert.alert("Cubicle error", e.message);
+      setCubicle({ status: "idle" });
+      await roomRef.current?.localParticipant.setMicrophoneEnabled(
+        micEnabledRef.current,
+      );
+      await roomRef.current?.localParticipant.setCameraEnabled(
+        camEnabledRef.current,
+      );
+    }
+  }
+
+  async function endCubicle() {
+    const current = cubicleRef.current;
+    if (current.status !== "active") return;
+    const { partnerIdentity } = current;
+    await cubicleChannelRef.current?.send({
+      type: "broadcast",
+      event: "cubicle-end",
+      payload: {
+        fromIdentity: profile?.username,
+        targetIdentity: partnerIdentity,
+      },
+    });
+    endCubicleLocal(partnerIdentity);
+  }
+
+  async function endCubicleLocal(partnerIdentity: string) {
+    await cubicleRoomRef.current?.disconnect();
+    cubicleRoomRef.current = null;
+    setCubicleToken(null);
+    await roomRef.current?.localParticipant.setMicrophoneEnabled(
+      micEnabledRef.current,
+    );
+    await roomRef.current?.localParticipant.setCameraEnabled(
+      camEnabledRef.current,
+    );
+    setCubicle({ status: "idle" });
+    setCubicleSet((prev) => {
+      const s = new Set(prev);
+      s.delete(profile?.username ?? "");
+      s.delete(partnerIdentity);
+      return s;
+    });
+  }
 
   const room = useMemo(() => {
     const r = new Room({
       adaptiveStream: true,
       dynacast: true,
       videoCaptureDefaults: {
-        resolution: resPreset,
-        facingMode: "user", // start on front cam explicitly
+        resolution: VideoPresets.h720,
+        facingMode: "user",
       },
     } as RoomOptions);
     roomRef.current = r;
     return r;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resPreset]);
+  }, []);
 
-  function handleConnected() {
+  const cubicleRoom = useMemo(() => {
+    if (cubicle.status !== "active" || !cubicleToken) return null;
+    const r = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      videoCaptureDefaults: {
+        resolution: VideoPresets.h720,
+        facingMode: "user",
+      },
+    } as RoomOptions);
+    cubicleRoomRef.current = r;
+    return r;
+  }, [cubicle.status, cubicleToken]);
+
+  const handleConnected = useCallback(() => {
+    const r = roomRef.current;
+    if (!r) return;
+
+    if (syncRef.current) {
+      r.off(RoomEvent.ParticipantConnected, syncRef.current);
+      r.off(RoomEvent.ParticipantDisconnected, syncRef.current);
+      r.off(RoomEvent.TrackMuted, syncRef.current);
+      r.off(RoomEvent.TrackUnmuted, syncRef.current);
+      r.off(RoomEvent.LocalTrackPublished, syncRef.current);
+      r.off(RoomEvent.LocalTrackUnpublished, syncRef.current);
+      r.off(RoomEvent.TrackSubscribed, syncRef.current);
+      r.off(RoomEvent.TrackUnsubscribed, syncRef.current);
+    }
+
     const sync = () => {
-      if (!roomRef.current) return;
-      const remote = Array.from(roomRef.current.remoteParticipants.values());
-      setParticipants([roomRef.current.localParticipant, ...remote]);
+      const room = roomRef.current;
+      if (!room) return;
+      const remote = Array.from(room.remoteParticipants.values());
+      const all: Participant[] = [room.localParticipant, ...remote];
+      setParticipants(all);
+      const offSet = new Set<string>();
+      all.forEach((p) => {
+        const hasCamTrack =
+          p.getTrackPublication(Track.Source.Camera)?.track != null;
+        if (!p.isCameraEnabled || !hasCamTrack) offSet.add(p.identity);
+      });
+      setCamOffSet(offSet);
     };
-    sync();
-    room.on(RoomEvent.ParticipantConnected, sync);
-    room.on(RoomEvent.ParticipantDisconnected, sync);
-  }
 
-  // ── Controls ───────────────────────────────────────────────────────────────
+    syncRef.current = sync;
+
+    r.on(RoomEvent.ParticipantConnected, sync);
+    r.on(RoomEvent.ParticipantDisconnected, sync);
+    r.on(RoomEvent.TrackMuted, sync);
+    r.on(RoomEvent.TrackUnmuted, sync);
+    r.on(RoomEvent.LocalTrackPublished, sync);
+    r.on(RoomEvent.LocalTrackUnpublished, sync);
+    r.on(RoomEvent.TrackSubscribed, sync);
+    r.on(RoomEvent.TrackUnsubscribed, sync);
+
+    if (Platform.OS === "android") {
+      setTimeout(sync, 800);
+    } else {
+      sync();
+    }
+  }, []);
+
+  // ── Mic toggle — gated by session phase ──────────────────────────────
   async function toggleMic() {
+    if (cubicleRef.current.status === "active") return;
+
+    if (!phaseState.micAllowed) {
+      const mins = Math.floor(phaseState.remainingSeconds / 60);
+      const secs = phaseState.remainingSeconds % 60;
+      Alert.alert(
+        "Mic locked during focus",
+        `Mics unlock in ${mins}m ${secs}s when the break starts.`,
+      );
+      return;
+    }
+
     const next = !micEnabled;
     await roomRef.current?.localParticipant.setMicrophoneEnabled(next);
+    micEnabledRef.current = next;
     setMicEnabled(next);
   }
 
   async function toggleCam() {
+    if (cubicleRef.current.status === "active") return;
     const next = !camEnabled;
     await roomRef.current?.localParticipant.setCameraEnabled(next);
+    camEnabledRef.current = next;
     setCamEnabled(next);
+    const identity = roomRef.current?.localParticipant.identity;
+    if (identity) {
+      setCamOffSet((prev) => {
+        const s = new Set(prev);
+        next ? s.delete(identity) : s.add(identity);
+        return s;
+      });
+    }
   }
 
   async function flipCamera() {
     const lp = roomRef.current?.localParticipant;
     if (!lp) return;
-
     const nextFront = !isFrontCam;
     const facingMode = nextFront ? "user" : "environment";
-
     try {
-      // 1. Unpublish the current camera track
       const camPub = lp.getTrackPublication(Track.Source.Camera);
-      if (camPub?.track) {
-        await lp.unpublishTrack(camPub.track);
-      }
-
-      // 2. Re-enable camera with the new facing mode — livekit-react-native
-      //    reads videoCaptureDefaults merged with the options passed here.
-      await lp.setCameraEnabled(true, {
-        facingMode,
-        resolution: getResolutionPreset(participantCount),
-      } as any);
-
+      if (camPub?.track) await lp.unpublishTrack(camPub.track);
+      await lp.setCameraEnabled(true, { facingMode } as any);
       setIsFrontCam(nextFront);
     } catch (e: any) {
       Alert.alert("Camera flip failed", e.message);
@@ -342,107 +722,513 @@ export default function RoomScreen() {
   }
 
   async function leave() {
+    if (cubicleRef.current.status === "active") await endCubicle();
+
+    if (syncRef.current && roomRef.current) {
+      roomRef.current.off(RoomEvent.ParticipantConnected, syncRef.current);
+      roomRef.current.off(RoomEvent.ParticipantDisconnected, syncRef.current);
+      roomRef.current.off(RoomEvent.TrackMuted, syncRef.current);
+      roomRef.current.off(RoomEvent.TrackUnmuted, syncRef.current);
+      roomRef.current.off(RoomEvent.LocalTrackPublished, syncRef.current);
+      roomRef.current.off(RoomEvent.LocalTrackUnpublished, syncRef.current);
+      roomRef.current.off(RoomEvent.TrackSubscribed, syncRef.current);
+      roomRef.current.off(RoomEvent.TrackUnsubscribed, syncRef.current);
+    }
+
     await roomRef.current?.disconnect();
-    router.back();
+    await new Promise((r) => setTimeout(r, 500));
+
+    if (router.canGoBack()) router.back();
+    else router.replace("/main");
   }
 
-  // ── Loading / error ────────────────────────────────────────────────────────
+  const focusParticipant = useCallback((identity: string) => {
+    setFocusedIdentity(identity);
+  }, []);
+
+  const unfocusParticipant = useCallback(() => {
+    setFocusedIdentity(null);
+  }, []);
+
+  useEffect(() => {
+    if (cubicle.status !== "incoming") return;
+    Alert.alert(
+      "Cubicle Request",
+      `${cubicle.fromIdentity} wants to open a private cubicle with you.`,
+      [
+        { text: "Decline", style: "destructive", onPress: declineCubicle },
+        { text: "Accept", onPress: acceptCubicle },
+      ],
+    );
+  }, [cubicle.status]);
+
   if (loading) {
     return (
-      <SafeAreaView style={s.loader} edges={["top", "bottom"]}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-        <ActivityIndicator size="large" color={C.accent} />
-        <Text style={s.loaderText}>Joining meeting…</Text>
+      <SafeAreaView
+        style={[styles.loader, { backgroundColor: colors.bg.canvas }]}
+        edges={["top", "bottom"]}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={colors.bg.canvas}
+        />
+        <ActivityIndicator size="large" color={colors.tint.accent} />
+        <Text style={[styles.loaderText, { color: colors.text.secondary }]}>
+          Joining meeting…
+        </Text>
       </SafeAreaView>
     );
   }
-  if (!token) {
+
+  if (!token || !livekitReady) {
     return (
-      <SafeAreaView style={s.loader} edges={["top", "bottom"]}>
-        <Text style={s.loaderText}>Failed to get token</Text>
+      <SafeAreaView
+        style={[styles.loader, { backgroundColor: colors.bg.canvas }]}
+        edges={["top", "bottom"]}
+      >
+        <Text style={[styles.loaderText, { color: colors.text.secondary }]}>
+          Failed to get token
+        </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <LiveKitRoom
-      serverUrl={LIVEKIT_URL}
-      token={token}
-      connect
-      audio
-      video
-      room={room}
-      onConnected={handleConnected}
-      onDisconnected={() => router.back()}
-      onError={(e) => Alert.alert("Connection error", e?.message ?? "Unknown")}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-      {/* Edge-swipe zone covers full screen; sidebar pan captures right-side drags */}
-      <View style={s.root} {...edgePanResponder.panHandlers}>
-        {/* ── Top bar */}
-        <SafeAreaView edges={["top"]} style={s.topBarWrap}>
-          <TopBar
-            roomName={roomName ?? "Meeting"}
-            participantCount={participantCount}
-            resolution={getResolutionLabel(participantCount)}
-            onParticipants={commitOpen}
-          />
-        </SafeAreaView>
+    <>
+      <LiveKitRoom
+        serverUrl={LIVEKIT_URL}
+        token={token}
+        connect
+        audio
+        video
+        room={room}
+        onConnected={handleConnected}
+        onDisconnected={() => {
+          setTimeout(() => {
+            if (router.canGoBack()) router.back();
+            else router.replace("/main");
+          }, 100);
+        }}
+        onError={(e) =>
+          Alert.alert("Connection error", e?.message ?? "Unknown")
+        }
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={colors.bg.canvas}
+        />
+        <View
+          style={[styles.root, { backgroundColor: colors.bg.canvas }]}
+          {...edgePanResponder.panHandlers}
+        >
+          <SafeAreaView
+            edges={["top"]}
+            style={[
+              styles.topBarWrap,
+              {
+                backgroundColor: colors.surface.primary,
+                borderBottomColor: colors.border.subtle,
+              },
+            ]}
+          >
+            <TopBar
+              roomName={roomName ?? "Meeting"}
+              participantCount={participants.length}
+              onParticipants={commitOpen}
+              focusedIdentity={focusedIdentity}
+              onUnfocus={unfocusParticipant}
+              colors={colors}
+              inCubicle={cubicle.status === "active"}
+              cubiclePartner={
+                cubicle.status === "active" ? cubicle.partnerIdentity : null
+              }
+              onEndCubicle={endCubicle}
+              sessionPhase={phaseState.phase}
+              sessionRemainingSeconds={phaseState.remainingSeconds}
+            />
+          </SafeAreaView>
 
-        {/* ── Video grid */}
-        <View style={s.gridWrap}>
-          <ConferenceView participantCount={participantCount} />
+          <View
+            style={styles.gridWrap}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              setGridSize({ w: width, h: height });
+            }}
+          >
+            <ConferenceView
+              focusedIdentity={focusedIdentity}
+              onFocus={focusParticipant}
+              onUnfocus={unfocusParticipant}
+              camOffSet={camOffSet}
+              cubicleSet={cubicleSet}
+              gridW={gridSize.w}
+              gridH={gridSize.h}
+              colors={colors}
+              onDoubleTap={sendCubicleRequest}
+              myIdentity={profile?.username ?? ""}
+            />
+          </View>
+
+          <SafeAreaView
+            edges={["bottom"]}
+            style={[
+              styles.ctrlWrap,
+              {
+                backgroundColor: colors.surface.primary,
+                borderTopColor: colors.border.subtle,
+              },
+            ]}
+          >
+            <ControlBar
+              micEnabled={micEnabled}
+              camEnabled={camEnabled}
+              isFrontCam={isFrontCam}
+              outputLabel={activeDevice.name}
+              onMic={toggleMic}
+              onCam={toggleCam}
+              onFlip={flipCamera}
+              onOutput={showOutputPicker}
+              onLeave={leave}
+              colors={colors}
+              lockedForCubicle={cubicle.status === "active"}
+              sessionPhase={phaseState.phase}
+              focusRemainingSeconds={
+                phaseState.phase === "focus" ? phaseState.remainingSeconds : 0
+              }
+            />
+          </SafeAreaView>
+
+          <Animated.View
+            style={[styles.scrim, { opacity: sidebarOpacity }]}
+            pointerEvents={sidebarOpen ? "auto" : "none"}
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={commitClose} />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.sidebarShell,
+              { transform: [{ translateX: sidebarX }] },
+            ]}
+            {...sidebarPanResponder.panHandlers}
+          >
+            <ParticipantsSidebar
+              participants={participants}
+              cubicleSet={cubicleSet}
+              onClose={commitClose}
+              colors={colors}
+            />
+          </Animated.View>
         </View>
+      </LiveKitRoom>
 
-        {/* ── Control bar */}
-        <SafeAreaView edges={["bottom"]} style={s.ctrlWrap}>
-          <ControlBar
-            micEnabled={micEnabled}
-            camEnabled={camEnabled}
-            isFrontCam={isFrontCam}
-            outputLabel={activeDevice.name}
-            onMic={toggleMic}
-            onCam={toggleCam}
-            onFlip={flipCamera}
-            onOutput={showOutputPicker}
-            onLeave={leave}
-          />
-        </SafeAreaView>
-
-        {/* ── Scrim: always rendered (opacity 0 when closed) so gestures work */}
-        <Animated.View
-          style={[s.scrim, { opacity: sidebarOpacity }]}
-          pointerEvents={sidebarOpen ? "auto" : "none"}
+      {cubicle.status === "active" && cubicleToken && cubicleRoom && (
+        <LiveKitRoom
+          serverUrl={LIVEKIT_URL}
+          token={cubicleToken}
+          connect
+          audio
+          video
+          room={cubicleRoom}
+          onConnected={() => {}}
+          onDisconnected={() =>
+            endCubicleLocal(
+              cubicleRef.current.status === "active"
+                ? cubicleRef.current.partnerIdentity
+                : "",
+            )
+          }
+          onError={(e) => Alert.alert("Cubicle error", e?.message ?? "Unknown")}
         >
-          <Pressable style={StyleSheet.absoluteFill} onPress={commitClose} />
-        </Animated.View>
-
-        {/* ── Sidebar drawer: always in tree so pan responder is always attached */}
-        <Animated.View
-          style={[s.sidebarShell, { transform: [{ translateX: sidebarX }] }]}
-          {...sidebarPanResponder.panHandlers}
-        >
-          <ParticipantsSidebar
-            participants={participants}
-            onClose={commitClose}
+          <CubicleOverlay
+            partnerIdentity={cubicle.partnerIdentity}
+            onEnd={endCubicle}
+            colors={colors}
           />
-        </Animated.View>
-      </View>
-    </LiveKitRoom>
+        </LiveKitRoom>
+      )}
+    </>
   );
 }
 
-// ─── Top bar ──────────────────────────────────────────────────────────────────
+// ─── Cubicle overlay ───────────────────────────────────────────────────────
+function CubicleOverlay({
+  partnerIdentity,
+  onEnd,
+  colors,
+}: {
+  partnerIdentity: string;
+  onEnd: () => void;
+  colors: any;
+}) {
+  const allTracks = useTracks([Track.Source.Camera]);
+  const { localParticipant } = useLocalParticipant();
+  const [elapsed, setElapsed] = useState(0);
+  const [myTrackRef, setMyTrackRef] = useState<TrackReference | null>(null);
+  const [myTrackSid, setMyTrackSid] = useState<string | null>(null);
+  const [partnerReady, setPartnerReady] = useState(false);
+  const localParticipantRef = useRef(localParticipant);
+  const partnerReadyRef = useRef(false);
+
+  useEffect(() => {
+    localParticipantRef.current = localParticipant;
+  }, [localParticipant]);
+
+  useEffect(() => {
+    const iv = setInterval(() => setElapsed((n) => n + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    if (!localParticipant) return;
+    function sync() {
+      const lp = localParticipantRef.current;
+      if (!lp) return;
+      const pub = lp.getTrackPublication(Track.Source.Camera);
+      if (pub?.track && pub.trackSid) {
+        const ref: TrackReference = {
+          participant: lp,
+          publication: pub,
+          source: Track.Source.Camera,
+        };
+        setMyTrackSid((prev) => {
+          if (prev !== pub.trackSid) {
+            setMyTrackRef(ref);
+            return pub.trackSid ?? null;
+          }
+          return prev;
+        });
+      } else {
+        setMyTrackRef(null);
+        setMyTrackSid(null);
+      }
+    }
+    sync();
+    localParticipant.on("trackPublished", sync);
+    localParticipant.on("trackUnpublished", sync);
+    localParticipant.on("localTrackPublished", sync);
+    localParticipant.on("trackSubscribed", sync);
+    return () => {
+      localParticipant.off("trackPublished", sync);
+      localParticipant.off("trackUnpublished", sync);
+      localParticipant.off("localTrackPublished", sync);
+      localParticipant.off("trackSubscribed", sync);
+    };
+  }, [localParticipant]);
+
+  useEffect(() => {
+    const lp = localParticipantRef.current;
+    if (!lp) return;
+    const pub = lp.getTrackPublication(Track.Source.Camera);
+    if (pub?.track && pub.trackSid && pub.trackSid !== myTrackSid) {
+      setMyTrackRef({
+        participant: lp,
+        publication: pub,
+        source: Track.Source.Camera,
+      });
+      setMyTrackSid(pub.trackSid ?? null);
+    }
+  }, [allTracks]);
+
+  const partnerTrack = allTracks.find(
+    (t) => t.participant.identity === partnerIdentity,
+  );
+
+  useEffect(() => {
+    if (partnerTrack && !partnerReadyRef.current) {
+      const delay = Platform.OS === "android" ? 600 : 0;
+      const t = setTimeout(() => {
+        partnerReadyRef.current = true;
+        setPartnerReady(true);
+      }, delay);
+      return () => clearTimeout(t);
+    }
+    if (!partnerTrack) {
+      partnerReadyRef.current = false;
+      setPartnerReady(false);
+    }
+  }, [partnerTrack]);
+
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
+
+  return (
+    <View style={styles.cubicleOverlay}>
+      <View style={styles.cubicleBg} />
+      <View style={styles.cubicleContainer}>
+        <View
+          style={[
+            styles.cubicleHeader,
+            {
+              backgroundColor: colors.surface.raised,
+              borderBottomColor: colors.border.subtle,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.cubicleBadge,
+              {
+                backgroundColor: colors.tint.accent + "22",
+                borderColor: colors.tint.accent + "55",
+              },
+            ]}
+          >
+            <Text
+              style={[styles.cubicleBadgeText, { color: colors.tint.accent }]}
+            >
+              ⬡ cubicle
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.cubicleTimer,
+              { color: colors.text.secondary, fontFamily: MONO },
+            ]}
+          >
+            {mm}:{ss}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.cubicleEndBtn,
+              { backgroundColor: colors.tint.danger },
+            ]}
+            onPress={onEnd}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.cubicleEndText}>End</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cubicleMainVideo}>
+          {myTrackRef && myTrackSid && (
+            <View
+              style={[
+                styles.cubiclePip,
+                {
+                  borderColor: localParticipant?.isSpeaking
+                    ? colors.tint.success
+                    : colors.border.subtle,
+                },
+              ]}
+            >
+              <VideoTrack
+                key={myTrackSid}
+                trackRef={myTrackRef}
+                style={styles.videoFill}
+                mirror={Platform.OS === "ios"}
+              />
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.cubiclePartnerVideo,
+              { opacity: partnerReady ? 1 : 0 },
+            ]}
+          >
+            {partnerTrack && (
+              <VideoTrack
+                key={partnerTrack.publication.trackSid}
+                trackRef={partnerTrack}
+                style={styles.videoFill}
+              />
+            )}
+          </View>
+
+          {!partnerReady && (
+            <View
+              style={[
+                styles.cubicleAvatarFallback,
+                { backgroundColor: colors.surface.secondary },
+              ]}
+            >
+              <View
+                style={[
+                  styles.camOffAvatar,
+                  {
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: colors.surface.raised,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.camOffAvatarText,
+                    { fontSize: 28, color: colors.text.secondary },
+                  ]}
+                >
+                  {initials(partnerIdentity)}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.camOffName,
+                  { color: colors.text.secondary, fontSize: 15 },
+                ]}
+              >
+                Waiting for {partnerIdentity}…
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.tileOverlay} />
+          <View style={styles.tileBottom}>
+            <View
+              style={[
+                styles.tileAvatar,
+                { backgroundColor: colors.tint.accent },
+              ]}
+            >
+              <Text style={styles.tileAvatarText}>
+                {initials(partnerIdentity)}
+              </Text>
+            </View>
+            <Text
+              style={[styles.tileName, { color: colors.text.inverse }]}
+              numberOfLines={1}
+            >
+              {partnerIdentity}
+            </Text>
+            {partnerTrack?.participant.isSpeaking && (
+              <SpeakingBars color={colors.tint.success} />
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Top bar ───────────────────────────────────────────────────────────────
 function TopBar({
   roomName,
   participantCount,
   resolution,
   onParticipants,
+  focusedIdentity,
+  onUnfocus,
+  colors,
+  inCubicle,
+  cubiclePartner,
+  onEndCubicle,
+  sessionPhase,
+  sessionRemainingSeconds,
 }: {
   roomName: string;
   participantCount: number;
-  resolution: string;
+  resolution?: string;
   onParticipants: () => void;
+  focusedIdentity: string | null;
+  onUnfocus: () => void;
+  colors: any;
+  inCubicle: boolean;
+  cubiclePartner: string | null;
+  onEndCubicle: () => void;
+  sessionPhase: "waiting" | "focus" | "break";
+  sessionRemainingSeconds: number;
 }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -452,170 +1238,1226 @@ function TopBar({
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
 
+  const phaseColor =
+    sessionPhase === "break"
+      ? colors.tint.success
+      : sessionPhase === "focus"
+        ? colors.tint.accent
+        : colors.text.tertiary;
+
+  const phaseLabel =
+    sessionPhase === "focus"
+      ? "Focus"
+      : sessionPhase === "break"
+        ? "Break"
+        : null;
+
+  const phaseMins = Math.floor(sessionRemainingSeconds / 60);
+  const phaseSecs = sessionRemainingSeconds % 60;
+
   return (
-    <View style={s.topBar}>
-      <View style={s.topLeft}>
-        <View style={s.liveChip}>
-          <View style={s.liveDot} />
-          <Text style={s.liveText}>LIVE</Text>
-        </View>
-        <Text style={s.roomName} numberOfLines={1}>
-          {roomName}
-        </Text>
+    <View style={styles.topBar}>
+      <View style={styles.topLeft}>
+        {focusedIdentity ? (
+          <TouchableOpacity
+            style={[
+              styles.focusBadge,
+              {
+                backgroundColor: colors.tint.accent + "22",
+                borderColor: colors.tint.accent + "55",
+              },
+            ]}
+            onPress={onUnfocus}
+            activeOpacity={0.75}
+          >
+            <Feather name="minimize-2" size={11} color={colors.tint.accent} />
+            <Text
+              style={[styles.focusBadgeText, { color: colors.tint.accent }]}
+            >
+              Focused: {focusedIdentity}
+            </Text>
+            <Text
+              style={[styles.focusBadgeClose, { color: colors.tint.accent }]}
+            >
+              ✕
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text
+            style={[styles.roomName, { color: colors.text.primary }]}
+            numberOfLines={1}
+          >
+            {roomName}
+          </Text>
+        )}
       </View>
 
-      <Text style={s.timer}>
-        {mm}:{ss}
-      </Text>
-
-      <View style={s.topRight}>
-        <View style={s.resBadge}>
-          <Text style={s.resBadgeText}>{resolution}</Text>
+      {/* Session phase badge */}
+      {phaseLabel && (
+        <View
+          style={[
+            styles.phaseBadge,
+            {
+              backgroundColor: phaseColor + "22",
+              borderColor: phaseColor + "55",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.phaseBadgeText,
+              { color: phaseColor, fontFamily: MONO },
+            ]}
+          >
+            {phaseLabel} {String(phaseMins).padStart(2, "0")}:
+            {String(phaseSecs).padStart(2, "0")}
+          </Text>
         </View>
+      )}
+
+      {/* <Text style={[styles.timer, { color: colors.text.secondary }]}>
+        {mm}:{ss}
+      </Text> */}
+
+      <View style={styles.topRight}>
+        {/* <View
+          style={[
+            styles.resBadge,
+            {
+              backgroundColor: colors.tint.accent + "22",
+              borderColor: colors.tint.accent + "55",
+            },
+          ]}
+        >
+          <Text style={[styles.resBadgeText, { color: colors.tint.accent }]}>
+            {resolution}
+          </Text>
+        </View> */}
         <TouchableOpacity
-          style={s.participantsBtn}
+          style={[
+            styles.participantsBtn,
+            {
+              backgroundColor: colors.surface.secondary,
+              borderColor: colors.border.subtle,
+            },
+          ]}
           onPress={onParticipants}
           activeOpacity={0.72}
         >
-          {/* Replace with: <Feather name="users" size={15} color={C.text} /> */}
-          <Text style={s.participantsBtnIcon}>&#9651;</Text>
-          <Text style={s.participantsBtnCount}>{participantCount}</Text>
+          <Feather name="users" size={15} color={colors.text.primary} />
+          <Text
+            style={[
+              styles.participantsBtnCount,
+              { color: colors.text.primary },
+            ]}
+          >
+            {participantCount}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-// ─── Video grid ───────────────────────────────────────────────────────────────
-function ConferenceView({ participantCount }: { participantCount: number }) {
+function ConferenceView({
+  focusedIdentity,
+  onFocus,
+  onUnfocus,
+  camOffSet,
+  cubicleSet,
+  gridW,
+  gridH,
+  colors,
+  onDoubleTap,
+  myIdentity,
+}: {
+  focusedIdentity: string | null;
+  onFocus: (id: string) => void;
+  onUnfocus: () => void;
+  camOffSet: Set<string>;
+  cubicleSet: Set<string>;
+  gridW: number;
+  gridH: number;
+  colors: any;
+  onDoubleTap: (identity: string) => void;
+  myIdentity: string;
+}) {
   const tracks = useTracks([Track.Source.Camera]);
-  const columns = getGridColumns(participantCount);
-  const GAP = 5;
-  const tileW = (SCREEN_W - GAP * (columns + 1)) / columns;
-  const tileH = tileW * (9 / 16);
+  const [activePage, setActivePage] = useState(0);
+  const pageScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const totalPages = Math.ceil(Math.max(tracks.length, 1) / TILES_PER_PAGE);
+    if (activePage >= totalPages) setActivePage(0);
+  }, [tracks.length]);
 
   if (tracks.length === 0) {
     return (
-      <View style={s.empty}>
-        <Text style={s.emptyIcon}>⬡</Text>
-        <Text style={s.emptyTitle}>Waiting for participants</Text>
-        <Text style={s.emptySub}>Share the room name to invite others</Text>
+      <View style={styles.empty}>
+        <Text style={[styles.emptyIcon, { color: colors.surface.raised }]}>
+          ⬡
+        </Text>
+        <Text style={[styles.emptyTitle, { color: colors.text.secondary }]}>
+          Waiting for participants
+        </Text>
+        <Text style={[styles.emptySub, { color: colors.text.tertiary }]}>
+          Share the room name to invite others
+        </Text>
       </View>
     );
   }
 
-  return (
-    <ScrollView
-      contentContainerStyle={[s.grid, { padding: GAP, gap: GAP }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {tracks.map((ref) => (
-        <ParticipantTile
-          key={`${ref.participant.identity}-${ref.publication.trackSid}`}
-          trackRef={ref}
-          width={tileW}
-          height={tileH}
-        />
-      ))}
-    </ScrollView>
-  );
-}
+  if (focusedIdentity) {
+    const focusedTrack = tracks.find(
+      (t) => t.participant.identity === focusedIdentity,
+    );
+    const otherTracks = tracks.filter(
+      (t) => t.participant.identity !== focusedIdentity,
+    );
+    const STRIP_H = 110;
+    const STRIP_TILE_W = 80;
 
-// ─── Participant tile ─────────────────────────────────────────────────────────
-function ParticipantTile({
-  trackRef,
-  width,
-  height,
-}: {
-  trackRef: TrackReference;
-  width: number;
-  height: number;
-}) {
-  const { participant: p } = trackRef;
-  const isSpeaking = p.isSpeaking;
-  const isMuted = !p.isMicrophoneEnabled;
-
-  return (
-    <View style={[s.tile, { width, height }, isSpeaking && s.tileSpeaking]}>
-      <VideoTrack trackRef={trackRef} style={StyleSheet.absoluteFill} />
-      <View style={s.tileOverlay} />
-      <View style={s.tileBottom}>
-        <View style={s.tileAvatar}>
-          <Text style={s.tileAvatarText}>{initials(p.identity)}</Text>
+    return (
+      <View style={{ flex: 1, width: gridW, height: gridH }}>
+        <View style={{ flex: 1 }}>
+          {focusedTrack ? (
+            <ParticipantTile
+              key={`focused-${focusedTrack.participant.identity}`}
+              trackRef={focusedTrack}
+              width={gridW}
+              height={gridH - (otherTracks.length > 0 ? STRIP_H : 0)}
+              isCamOff={camOffSet.has(focusedTrack.participant.identity)}
+              inCubicle={cubicleSet.has(focusedTrack.participant.identity)}
+              onFocus={onFocus}
+              onUnfocus={onUnfocus}
+              isFocused
+              borderRadius={0}
+              colors={colors}
+              onDoubleTap={onDoubleTap}
+              isMe={focusedTrack.participant.identity === myIdentity}
+            />
+          ) : (
+            <AvatarTile
+              identity={focusedIdentity}
+              width={gridW}
+              height={gridH - (otherTracks.length > 0 ? STRIP_H : 0)}
+              isFocused
+              inCubicle={cubicleSet.has(focusedIdentity)}
+              onFocus={onFocus}
+              onUnfocus={onUnfocus}
+              borderRadius={0}
+              colors={colors}
+              onDoubleTap={onDoubleTap}
+              isMe={focusedIdentity === myIdentity}
+            />
+          )}
         </View>
-        <Text style={s.tileName} numberOfLines={1}>
-          {p.identity}
-        </Text>
-        {isMuted && (
-          <View style={s.mutedPill}>
-            <Text style={s.mutedPillText}>MIC OFF</Text>
-          </View>
+        {otherTracks.length > 0 && (
+          <ScrollView
+            horizontal
+            style={{ height: STRIP_H, backgroundColor: colors.bg.canvas }}
+            contentContainerStyle={{
+              paddingHorizontal: 6,
+              gap: 4,
+              alignItems: "center",
+            }}
+            showsHorizontalScrollIndicator={false}
+          >
+            {otherTracks.map((ref) => (
+              <ParticipantTile
+                key={`strip-${ref.participant.identity}`}
+                trackRef={ref}
+                width={STRIP_TILE_W}
+                height={STRIP_H - 12}
+                isCamOff={camOffSet.has(ref.participant.identity)}
+                inCubicle={cubicleSet.has(ref.participant.identity)}
+                onFocus={onFocus}
+                onUnfocus={onUnfocus}
+                isFocused={false}
+                borderRadius={8}
+                colors={colors}
+                onDoubleTap={onDoubleTap}
+                isMe={ref.participant.identity === myIdentity}
+              />
+            ))}
+          </ScrollView>
         )}
-        {isSpeaking && <SpeakingBars />}
+      </View>
+    );
+  }
+
+  if (tracks.length <= 6) {
+    const layout = computeGrid(tracks.length, gridW, gridH);
+
+    if (tracks.length === 3) {
+      const halfH = gridH / 2;
+      const halfW = gridW / 2;
+      return (
+        <View style={{ width: gridW, height: gridH }}>
+          <ParticipantTile
+            key={`${tracks[0].participant.identity}-${tracks[0].publication.trackSid}`}
+            trackRef={tracks[0]}
+            width={gridW}
+            height={halfH}
+            isCamOff={camOffSet.has(tracks[0].participant.identity)}
+            inCubicle={cubicleSet.has(tracks[0].participant.identity)}
+            onFocus={onFocus}
+            onUnfocus={onUnfocus}
+            isFocused={false}
+            borderRadius={0}
+            colors={colors}
+            onDoubleTap={onDoubleTap}
+            isMe={tracks[0].participant.identity === myIdentity}
+          />
+          <View style={{ flexDirection: "row" }}>
+            {tracks.slice(1).map((ref) => (
+              <ParticipantTile
+                key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                trackRef={ref}
+                width={halfW}
+                height={halfH}
+                isCamOff={camOffSet.has(ref.participant.identity)}
+                inCubicle={cubicleSet.has(ref.participant.identity)}
+                onFocus={onFocus}
+                onUnfocus={onUnfocus}
+                isFocused={false}
+                borderRadius={0}
+                colors={colors}
+                onDoubleTap={onDoubleTap}
+                isMe={ref.participant.identity === myIdentity}
+              />
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    if (tracks.length === 5) {
+      const halfH = gridH / 2;
+      const halfW = gridW / 2;
+      const thirdW = gridW / 3;
+      return (
+        <View style={{ width: gridW, height: gridH }}>
+          <View style={{ flexDirection: "row" }}>
+            {tracks.slice(0, 2).map((ref) => (
+              <ParticipantTile
+                key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                trackRef={ref}
+                width={halfW}
+                height={halfH}
+                isCamOff={camOffSet.has(ref.participant.identity)}
+                inCubicle={cubicleSet.has(ref.participant.identity)}
+                onFocus={onFocus}
+                onUnfocus={onUnfocus}
+                isFocused={false}
+                borderRadius={0}
+                colors={colors}
+                onDoubleTap={onDoubleTap}
+                isMe={ref.participant.identity === myIdentity}
+              />
+            ))}
+          </View>
+          <View style={{ flexDirection: "row" }}>
+            {tracks.slice(2).map((ref) => (
+              <ParticipantTile
+                key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                trackRef={ref}
+                width={thirdW}
+                height={halfH}
+                isCamOff={camOffSet.has(ref.participant.identity)}
+                inCubicle={cubicleSet.has(ref.participant.identity)}
+                onFocus={onFocus}
+                onUnfocus={onUnfocus}
+                isFocused={false}
+                borderRadius={0}
+                colors={colors}
+                onDoubleTap={onDoubleTap}
+                isMe={ref.participant.identity === myIdentity}
+              />
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={{
+          width: gridW,
+          height: gridH,
+          flexDirection: "row",
+          flexWrap: "wrap",
+        }}
+      >
+        {tracks.map((ref) => (
+          <ParticipantTile
+            key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+            trackRef={ref}
+            width={layout.tileW}
+            height={layout.tileH}
+            isCamOff={camOffSet.has(ref.participant.identity)}
+            inCubicle={cubicleSet.has(ref.participant.identity)}
+            onFocus={onFocus}
+            onUnfocus={onUnfocus}
+            isFocused={false}
+            borderRadius={0}
+            colors={colors}
+            onDoubleTap={onDoubleTap}
+            isMe={ref.participant.identity === myIdentity}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  const pages: (typeof tracks)[] = [];
+  for (let i = 0; i < tracks.length; i += TILES_PER_PAGE) {
+    pages.push(tracks.slice(i, i + TILES_PER_PAGE));
+  }
+  const totalPages = pages.length;
+  const DOT_AREA_H = 28;
+  const pageGridH = gridH - DOT_AREA_H;
+
+  return (
+    <View style={{ width: gridW, height: gridH }}>
+      <ScrollView
+        ref={pageScrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={(e) => {
+          const page = Math.round(e.nativeEvent.contentOffset.x / gridW);
+          setActivePage(page);
+        }}
+        style={{ width: gridW, height: pageGridH }}
+        contentContainerStyle={{ height: pageGridH }}
+      >
+        {pages.map((pageTracks, pageIdx) => {
+          const pageLayout = computeGrid(pageTracks.length, gridW, pageGridH);
+
+          if (pageTracks.length === 3) {
+            const halfH = pageGridH / 2;
+            const halfW = gridW / 2;
+            return (
+              <View key={pageIdx} style={{ width: gridW, height: pageGridH }}>
+                <ParticipantTile
+                  key={`${pageTracks[0].participant.identity}-${pageTracks[0].publication.trackSid}`}
+                  trackRef={pageTracks[0]}
+                  width={gridW}
+                  height={halfH}
+                  isCamOff={camOffSet.has(pageTracks[0].participant.identity)}
+                  inCubicle={cubicleSet.has(pageTracks[0].participant.identity)}
+                  onFocus={onFocus}
+                  onUnfocus={onUnfocus}
+                  isFocused={false}
+                  borderRadius={0}
+                  colors={colors}
+                  onDoubleTap={onDoubleTap}
+                  isMe={pageTracks[0].participant.identity === myIdentity}
+                />
+                <View style={{ flexDirection: "row" }}>
+                  {pageTracks.slice(1).map((ref) => (
+                    <ParticipantTile
+                      key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                      trackRef={ref}
+                      width={halfW}
+                      height={halfH}
+                      isCamOff={camOffSet.has(ref.participant.identity)}
+                      inCubicle={cubicleSet.has(ref.participant.identity)}
+                      onFocus={onFocus}
+                      onUnfocus={onUnfocus}
+                      isFocused={false}
+                      borderRadius={0}
+                      colors={colors}
+                      onDoubleTap={onDoubleTap}
+                      isMe={ref.participant.identity === myIdentity}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          }
+
+          if (pageTracks.length === 5) {
+            const halfH = pageGridH / 2;
+            const halfW = gridW / 2;
+            const thirdW = gridW / 3;
+            return (
+              <View key={pageIdx} style={{ width: gridW, height: pageGridH }}>
+                <View style={{ flexDirection: "row" }}>
+                  {pageTracks.slice(0, 2).map((ref) => (
+                    <ParticipantTile
+                      key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                      trackRef={ref}
+                      width={halfW}
+                      height={halfH}
+                      isCamOff={camOffSet.has(ref.participant.identity)}
+                      inCubicle={cubicleSet.has(ref.participant.identity)}
+                      onFocus={onFocus}
+                      onUnfocus={onUnfocus}
+                      isFocused={false}
+                      borderRadius={0}
+                      colors={colors}
+                      onDoubleTap={onDoubleTap}
+                      isMe={ref.participant.identity === myIdentity}
+                    />
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row" }}>
+                  {pageTracks.slice(2).map((ref) => (
+                    <ParticipantTile
+                      key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                      trackRef={ref}
+                      width={thirdW}
+                      height={halfH}
+                      isCamOff={camOffSet.has(ref.participant.identity)}
+                      inCubicle={cubicleSet.has(ref.participant.identity)}
+                      onFocus={onFocus}
+                      onUnfocus={onUnfocus}
+                      isFocused={false}
+                      borderRadius={0}
+                      colors={colors}
+                      onDoubleTap={onDoubleTap}
+                      isMe={ref.participant.identity === myIdentity}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          }
+
+          return (
+            <View
+              key={pageIdx}
+              style={{
+                width: gridW,
+                height: pageGridH,
+                flexDirection: "row",
+                flexWrap: "wrap",
+              }}
+            >
+              {pageTracks.map((ref) => (
+                <ParticipantTile
+                  key={`${ref.participant.identity}-${ref.publication.trackSid}`}
+                  trackRef={ref}
+                  width={pageLayout.tileW}
+                  height={pageLayout.tileH}
+                  isCamOff={camOffSet.has(ref.participant.identity)}
+                  inCubicle={cubicleSet.has(ref.participant.identity)}
+                  onFocus={onFocus}
+                  onUnfocus={onUnfocus}
+                  isFocused={false}
+                  borderRadius={0}
+                  colors={colors}
+                  onDoubleTap={onDoubleTap}
+                  isMe={ref.participant.identity === myIdentity}
+                />
+              ))}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.pageDots}>
+        {pages.map((_, i) => (
+          <TouchableOpacity
+            key={i}
+            onPress={() => {
+              pageScrollRef.current?.scrollTo({ x: i * gridW, animated: true });
+              setActivePage(i);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View
+              style={[
+                styles.pageDot,
+                {
+                  backgroundColor:
+                    i === activePage
+                      ? colors.tint.accent
+                      : colors.border.subtle,
+                  width: i === activePage ? 18 : 7,
+                },
+              ]}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
 }
 
-function SpeakingBars() {
+// ─── Participant tile ──────────────────────────────────────────────────────
+function ParticipantTile({
+  trackRef,
+  width,
+  height,
+  isCamOff,
+  inCubicle,
+  onFocus,
+  onUnfocus,
+  isFocused,
+  borderRadius,
+  colors,
+  onDoubleTap,
+  isMe,
+}: {
+  trackRef: TrackReference;
+  width: number;
+  height: number;
+  isCamOff: boolean;
+  inCubicle: boolean;
+  onFocus: (id: string) => void;
+  onUnfocus: () => void;
+  isFocused: boolean;
+  borderRadius: number;
+  colors: any;
+  onDoubleTap: (identity: string) => void;
+  isMe: boolean;
+}) {
+  const { participant: p } = trackRef;
+  const isSpeaking = p.isSpeaking;
+  const isMuted = !p.isMicrophoneEnabled;
+  const [menuVisible, setMenuVisible] = useState(false);
+  const lastTap = useRef<number>(0);
+
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (!isMe) onDoubleTap(p.identity);
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
+    }
+  }
+
   return (
-    <View style={s.bars}>
-      <View style={[s.bar, { height: 8 }]} />
-      <View style={[s.bar, { height: 14 }]} />
-      <View style={[s.bar, { height: 8 }]} />
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={handleTap}
+      style={[
+        styles.tile,
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: colors.surface.primary,
+          borderColor: inCubicle
+            ? colors.tint.accent
+            : isSpeaking
+              ? colors.tint.success
+              : isFocused
+                ? colors.tint.accent
+                : colors.border.subtle,
+          borderWidth: inCubicle || isSpeaking || isFocused ? 2 : 1,
+          opacity: inCubicle && !isMe ? 0.5 : 1,
+        },
+      ]}
+    >
+      <View style={StyleSheet.absoluteFill}>
+        <VideoTrack trackRef={trackRef} style={styles.videoFill} />
+      </View>
+
+      {inCubicle && (
+        <View
+          style={[
+            styles.cubicleTileBadge,
+            { backgroundColor: colors.tint.accent + "cc" },
+          ]}
+        >
+          <Text style={styles.cubicleTileBadgeText}>⬡ cubicle</Text>
+        </View>
+      )}
+
+      {isCamOff && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.camOffOverlay,
+            { backgroundColor: colors.bg.muted },
+          ]}
+        >
+          <View
+            style={[
+              styles.camOffAvatar,
+              {
+                width: height * 0.32,
+                height: height * 0.32,
+                borderRadius: height * 0.16,
+                backgroundColor: colors.surface.raised,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.camOffAvatarText,
+                { fontSize: height * 0.12, color: colors.text.secondary },
+              ]}
+            >
+              {initials(p.identity)}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.camOffName,
+              {
+                fontSize: Math.max(10, height * 0.065),
+                color: colors.text.secondary,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {p.identity}
+          </Text>
+          <View
+            style={[
+              styles.camOffBadge,
+              { backgroundColor: colors.tint.danger + "20" },
+            ]}
+          >
+            <Feather name="video-off" size={10} color={colors.tint.danger} />
+            <Text
+              style={[styles.camOffBadgeText, { color: colors.tint.danger }]}
+            >
+              Camera off
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {!isCamOff && <View style={styles.tileOverlay} />}
+
+      <View style={styles.tileBottom}>
+        {!isCamOff && (
+          <View style={styles.PersonTile}>
+            <View
+              style={[
+                styles.tileAvatar,
+                { backgroundColor: colors.tint.accent },
+              ]}
+            >
+              <Text style={styles.tileAvatarText}>{initials(p.identity)}</Text>
+            </View>
+            <Text
+              style={[styles.tileName, { color: colors.text.white }]}
+              numberOfLines={1}
+            >
+              {p.identity}
+            </Text>
+          </View>
+        )}
+        {isMuted && (
+          <View
+            style={[
+              styles.mutedPill,
+              { backgroundColor: colors.tint.danger + "20" },
+            ]}
+          >
+            <Text style={[styles.mutedPillText, { color: colors.tint.danger }]}>
+              MIC OFF
+            </Text>
+          </View>
+        )}
+        {isSpeaking && <SpeakingBars color={colors.tint.success} />}
+      </View>
+
+      <TouchableOpacity
+        style={styles.tileMenuBtn}
+        onPress={() => setMenuVisible(true)}
+        activeOpacity={0.75}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <View style={styles.tileMenuDots}>
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </View>
+      </TouchableOpacity>
+
+      <TileMenu
+        visible={menuVisible}
+        identity={p.identity}
+        isFocused={isFocused}
+        onClose={() => setMenuVisible(false)}
+        onFocus={() => {
+          setMenuVisible(false);
+          onFocus(p.identity);
+        }}
+        onUnfocus={() => {
+          setMenuVisible(false);
+          onUnfocus();
+        }}
+        onCubicle={
+          !isMe
+            ? () => {
+                setMenuVisible(false);
+                onDoubleTap(p.identity);
+              }
+            : undefined
+        }
+        colors={colors}
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Avatar tile ───────────────────────────────────────────────────────────
+function AvatarTile({
+  identity,
+  width,
+  height,
+  isFocused,
+  inCubicle,
+  onFocus,
+  onUnfocus,
+  borderRadius,
+  colors,
+  onDoubleTap,
+  isMe,
+}: {
+  identity: string;
+  width: number;
+  height: number;
+  isFocused: boolean;
+  inCubicle: boolean;
+  onFocus: (id: string) => void;
+  onUnfocus: () => void;
+  borderRadius: number;
+  colors: any;
+  onDoubleTap: (identity: string) => void;
+  isMe: boolean;
+}) {
+  const [menuVisible, setMenuVisible] = useState(false);
+  const lastTap = useRef<number>(0);
+
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (!isMe) onDoubleTap(identity);
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={handleTap}
+      style={[
+        styles.tile,
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: colors.surface.secondary,
+          borderColor: inCubicle
+            ? colors.tint.accent
+            : isFocused
+              ? colors.tint.accent
+              : colors.border.subtle,
+          borderWidth: inCubicle || isFocused ? 2 : 1,
+          opacity: inCubicle && !isMe ? 0.5 : 1,
+        },
+      ]}
+    >
+      {inCubicle && (
+        <View
+          style={[
+            styles.cubicleTileBadge,
+            { backgroundColor: colors.tint.accent + "cc" },
+          ]}
+        >
+          <Text style={styles.cubicleTileBadgeText}>⬡ cubicle</Text>
+        </View>
+      )}
+      <View style={[StyleSheet.absoluteFill, styles.camOffOverlay]}>
+        <View
+          style={[
+            styles.camOffAvatar,
+            {
+              width: height * 0.32,
+              height: height * 0.32,
+              borderRadius: height * 0.16,
+              backgroundColor: colors.surface.raised,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.camOffAvatarText,
+              { fontSize: height * 0.12, color: colors.text.secondary },
+            ]}
+          >
+            {initials(identity)}
+          </Text>
+        </View>
+        <Text
+          style={[
+            styles.camOffName,
+            {
+              fontSize: Math.max(10, height * 0.065),
+              color: colors.text.secondary,
+            },
+          ]}
+        >
+          {identity}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.tileMenuBtn}
+        onPress={() => setMenuVisible(true)}
+        activeOpacity={0.75}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <View style={styles.tileMenuDots}>
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </View>
+      </TouchableOpacity>
+      <TileMenu
+        visible={menuVisible}
+        identity={identity}
+        isFocused={isFocused}
+        onClose={() => setMenuVisible(false)}
+        onFocus={() => {
+          setMenuVisible(false);
+          onFocus(identity);
+        }}
+        onUnfocus={() => {
+          setMenuVisible(false);
+          onUnfocus();
+        }}
+        onCubicle={
+          !isMe
+            ? () => {
+                setMenuVisible(false);
+                onDoubleTap(identity);
+              }
+            : undefined
+        }
+        colors={colors}
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Tile context menu ─────────────────────────────────────────────────────
+function TileMenu({
+  visible,
+  identity,
+  isFocused,
+  onClose,
+  onFocus,
+  onUnfocus,
+  onCubicle,
+  colors,
+}: {
+  visible: boolean;
+  identity: string;
+  isFocused: boolean;
+  onClose: () => void;
+  onFocus: () => void;
+  onUnfocus: () => void;
+  onCubicle?: () => void;
+  colors: any;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={[styles.menuBackdrop, { backgroundColor: colors.overlay.scrim }]}
+        onPress={onClose}
+      >
+        <View
+          style={[
+            styles.menuSheet,
+            {
+              backgroundColor: colors.surface.raised,
+              borderColor: colors.border.strong,
+            },
+          ]}
+        >
+          <View style={styles.menuHeader}>
+            <View
+              style={[
+                styles.menuAvatar,
+                { backgroundColor: colors.tint.accent },
+              ]}
+            >
+              <Text style={styles.menuAvatarText}>{initials(identity)}</Text>
+            </View>
+            <Text
+              style={[styles.menuTitle, { color: colors.text.primary }]}
+              numberOfLines={1}
+            >
+              {identity}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.menuDivider,
+              { backgroundColor: colors.border.subtle },
+            ]}
+          />
+
+          {!isFocused ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={onFocus}
+              activeOpacity={0.75}
+            >
+              <View
+                style={[
+                  styles.menuItemIcon,
+                  { backgroundColor: colors.tint.accent + "22" },
+                ]}
+              >
+                <Feather
+                  name="maximize-2"
+                  size={16}
+                  color={colors.tint.accent}
+                />
+              </View>
+              <View style={styles.menuItemText}>
+                <Text
+                  style={[styles.menuItemLabel, { color: colors.text.primary }]}
+                >
+                  Focus
+                </Text>
+                <Text
+                  style={[styles.menuItemSub, { color: colors.text.tertiary }]}
+                >
+                  Pin this participant full screen
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={onUnfocus}
+              activeOpacity={0.75}
+            >
+              <View
+                style={[
+                  styles.menuItemIcon,
+                  { backgroundColor: colors.tint.success + "22" },
+                ]}
+              >
+                <Feather
+                  name="minimize-2"
+                  size={16}
+                  color={colors.tint.success}
+                />
+              </View>
+              <View style={styles.menuItemText}>
+                <Text
+                  style={[styles.menuItemLabel, { color: colors.text.primary }]}
+                >
+                  Unfocus
+                </Text>
+                <Text
+                  style={[styles.menuItemSub, { color: colors.text.tertiary }]}
+                >
+                  Return to grid view
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {onCubicle && (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={onCubicle}
+              activeOpacity={0.75}
+            >
+              <View
+                style={[
+                  styles.menuItemIcon,
+                  { backgroundColor: colors.tint.accent + "22" },
+                ]}
+              >
+                <Feather name="radio" size={16} color={colors.tint.accent} />
+              </View>
+              <View style={styles.menuItemText}>
+                <Text
+                  style={[styles.menuItemLabel, { color: colors.text.primary }]}
+                >
+                  Open Cubicle
+                </Text>
+                <Text
+                  style={[styles.menuItemSub, { color: colors.text.tertiary }]}
+                >
+                  Private space with {identity}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.menuItem,
+              styles.menuItemCancel,
+              { borderTopColor: colors.border.subtle },
+            ]}
+            onPress={onClose}
+            activeOpacity={0.75}
+          >
+            <Text
+              style={[styles.menuCancelText, { color: colors.text.secondary }]}
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function SpeakingBars({ color }: { color: string }) {
+  return (
+    <View style={styles.bars}>
+      <View style={[styles.bar, { height: 8, backgroundColor: color }]} />
+      <View style={[styles.bar, { height: 14, backgroundColor: color }]} />
+      <View style={[styles.bar, { height: 8, backgroundColor: color }]} />
     </View>
   );
 }
 
-// ─── Participants sidebar ─────────────────────────────────────────────────────
+// ─── Participants sidebar ──────────────────────────────────────────────────
 function ParticipantsSidebar({
   participants,
+  cubicleSet,
   onClose,
+  colors,
 }: {
   participants: Participant[];
+  cubicleSet: Set<string>;
   onClose: () => void;
+  colors: any;
 }) {
   return (
-    <View style={s.sidebar}>
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: C.surface }}>
-        <View style={s.sidebarHeader}>
-          <Text style={s.sidebarTitle}>Participants</Text>
-          <View style={s.sidebarCountChip}>
-            <Text style={s.sidebarCountText}>{participants.length}</Text>
+    <View
+      style={[
+        styles.sidebar,
+        {
+          backgroundColor: colors.surface.primary,
+          borderLeftColor: colors.border.subtle,
+        },
+      ]}
+    >
+      <SafeAreaView
+        edges={["top"]}
+        style={{ backgroundColor: colors.surface.primary }}
+      >
+        <View style={styles.sidebarHeader}>
+          <Text style={[styles.sidebarTitle, { color: colors.text.primary }]}>
+            Participants
+          </Text>
+          <View
+            style={[
+              styles.sidebarCountChip,
+              { backgroundColor: colors.tint.accent + "22" },
+            ]}
+          >
+            <Text
+              style={[styles.sidebarCountText, { color: colors.tint.accent }]}
+            >
+              {participants.length}
+            </Text>
           </View>
           <TouchableOpacity
-            style={s.sidebarCloseBtn}
+            style={[
+              styles.sidebarCloseBtn,
+              { backgroundColor: colors.surface.secondary },
+            ]}
             onPress={onClose}
             activeOpacity={0.7}
           >
-            <Text style={s.sidebarCloseIcon}>✕</Text>
+            <Text
+              style={[
+                styles.sidebarCloseIcon,
+                { color: colors.text.secondary },
+              ]}
+            >
+              ✕
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-      <View style={s.divider} />
+      <View
+        style={[styles.divider, { backgroundColor: colors.border.subtle }]}
+      />
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {participants.map((p, idx) => {
           const speaking = p.isSpeaking;
           const muted = !p.isMicrophoneEnabled;
+          const inCubicle = cubicleSet.has(p.identity);
           return (
-            <View key={p.identity} style={s.pRow}>
-              <View style={[s.pAvatar, speaking && s.pAvatarSpeaking]}>
-                <Text style={s.pAvatarText}>{initials(p.identity)}</Text>
+            <View
+              key={p.identity}
+              style={[styles.pRow, { borderBottomColor: colors.border.subtle }]}
+            >
+              <View
+                style={[
+                  styles.pAvatar,
+                  {
+                    backgroundColor: colors.tint.accent,
+                    borderColor: speaking ? colors.tint.success : "transparent",
+                  },
+                ]}
+              >
+                <Text style={styles.pAvatarText}>{initials(p.identity)}</Text>
               </View>
-              <View style={s.pInfo}>
-                <Text style={s.pName} numberOfLines={1}>
+              <View style={styles.pInfo}>
+                <Text
+                  style={[styles.pName, { color: colors.text.primary }]}
+                  numberOfLines={1}
+                >
                   {p.identity}
                   {idx === 0 ? "  (You)" : ""}
                 </Text>
-                <Text style={s.pStatus}>
-                  {speaking ? "Speaking…" : "In meeting"}
+                <Text style={[styles.pStatus, { color: colors.text.tertiary }]}>
+                  {inCubicle
+                    ? "In cubicle"
+                    : speaking
+                      ? "Speaking…"
+                      : "In meeting"}
                 </Text>
               </View>
-              <View style={[s.pBadge, muted ? s.pBadgeOff : s.pBadgeOn]}>
+              <View
+                style={[
+                  styles.pBadge,
+                  {
+                    backgroundColor: inCubicle
+                      ? colors.tint.accent + "20"
+                      : muted
+                        ? colors.tint.danger + "20"
+                        : colors.tint.success + "20",
+                  },
+                ]}
+              >
                 <Text
-                  style={[s.pBadgeText, { color: muted ? C.red : C.green }]}
+                  style={[
+                    styles.pBadgeText,
+                    {
+                      color: inCubicle
+                        ? colors.tint.accent
+                        : muted
+                          ? colors.tint.danger
+                          : colors.tint.success,
+                    },
+                  ]}
                 >
-                  {muted ? "MUTED" : "LIVE"}
+                  {inCubicle ? "CUBICLE" : muted ? "MUTED" : "LIVE"}
                 </Text>
               </View>
             </View>
@@ -627,7 +2469,7 @@ function ParticipantsSidebar({
   );
 }
 
-// ─── Control bar ─────────────────────────────────────────────────────────────
+// ─── Control bar ───────────────────────────────────────────────────────────
 function ControlBar({
   micEnabled,
   camEnabled,
@@ -638,6 +2480,10 @@ function ControlBar({
   onFlip,
   onOutput,
   onLeave,
+  colors,
+  lockedForCubicle,
+  sessionPhase,
+  focusRemainingSeconds,
 }: {
   micEnabled: boolean;
   camEnabled: boolean;
@@ -648,44 +2494,60 @@ function ControlBar({
   onFlip: () => void;
   onOutput: () => void;
   onLeave: () => void;
+  colors: any;
+  lockedForCubicle: boolean;
+  sessionPhase: "waiting" | "focus" | "break";
+  focusRemainingSeconds: number;
 }) {
+  const micLocked = lockedForCubicle || sessionPhase === "focus";
+  const mins = Math.floor(focusRemainingSeconds / 60);
+  const secs = focusRemainingSeconds % 60;
+
   return (
-    <View style={s.controlBar}>
+    <View style={styles.controlBar}>
       <CtrlBtn
-        // icon: <Feather name={micEnabled ? "mic" : "mic-off"} …/>
-        icon={micEnabled ? "M" : "M✕"}
         label={micEnabled ? "Mute" : "Unmute"}
+        sublabel={
+          sessionPhase === "focus"
+            ? `${mins}m ${String(secs).padStart(2, "0")}s`
+            : sessionPhase === "break"
+              ? "mic open"
+              : undefined
+        }
         onPress={onMic}
-        state={micEnabled ? "on" : "off"}
+        state={micLocked ? "off" : micEnabled ? "on" : "off"}
+        icon={<Feather name={micEnabled ? "mic" : "mic-off"} />}
+        colors={colors}
+        disabled={micLocked}
       />
       <CtrlBtn
-        // icon: <Feather name={camEnabled ? "video" : "video-off"} …/>
-        icon={camEnabled ? "V" : "V✕"}
+        icon={<Feather name={camEnabled ? "video" : "video-off"} />}
         label={camEnabled ? "Stop Video" : "Start Video"}
         onPress={onCam}
-        state={camEnabled ? "on" : "off"}
+        state={lockedForCubicle ? "off" : camEnabled ? "on" : "off"}
+        colors={colors}
+        disabled={lockedForCubicle}
       />
       <CtrlBtn
-        // icon: <MaterialIcons name="flip-camera-ios" …/>
-        icon="↺"
+        icon={<MaterialIcons name="flip-camera-ios" />}
         label={isFrontCam ? "Rear Cam" : "Front Cam"}
         onPress={onFlip}
         state="on"
+        colors={colors}
       />
       <CtrlBtn
-        // icon: <Feather name="volume-2" …/>
-        icon="▲"
+        icon={<Feather name="volume-2" />}
         label={outputLabel}
-        sublabel="Output"
         onPress={onOutput}
         state="on"
+        colors={colors}
       />
       <CtrlBtn
-        // icon: <Feather name="phone-off" …/>
         icon="✕"
         label="End"
         onPress={onLeave}
         state="danger"
+        colors={colors}
       />
     </View>
   );
@@ -697,101 +2559,108 @@ function CtrlBtn({
   sublabel,
   onPress,
   state,
+  colors,
+  disabled,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   sublabel?: string;
   onPress: () => void;
   state: "on" | "off" | "danger";
+  colors: any;
+  disabled?: boolean;
 }) {
+  const circleBg =
+    state === "off"
+      ? colors.tint.danger + "20"
+      : state === "danger"
+        ? colors.tint.danger
+        : colors.surface.secondary;
+  const circleBorder =
+    state === "off"
+      ? colors.tint.danger + "45"
+      : state === "danger"
+        ? colors.tint.danger
+        : colors.border.subtle;
+  const iconColor =
+    state === "off"
+      ? colors.tint.danger
+      : state === "danger"
+        ? colors.text.inverse
+        : colors.text.primary;
+  const labelColor =
+    state === "off" || state === "danger"
+      ? colors.tint.danger
+      : colors.text.secondary;
+
   return (
-    <TouchableOpacity style={s.ctrlBtn} onPress={onPress} activeOpacity={0.72}>
+    <TouchableOpacity
+      style={[styles.ctrlBtn, disabled && { opacity: 0.4 }]}
+      onPress={onPress}
+      activeOpacity={0.72}
+      disabled={disabled}
+    >
       <View
         style={[
-          s.ctrlCircle,
-          state === "off" && s.ctrlCircleOff,
-          state === "danger" && s.ctrlCircleDanger,
+          styles.ctrlCircle,
+          { backgroundColor: circleBg, borderColor: circleBorder },
         ]}
       >
-        <Text
-          style={[
-            s.ctrlIcon,
-            state === "off" && { color: C.red },
-            state === "danger" && { color: "#fff" },
-          ]}
-        >
-          {icon}
-        </Text>
+        <Text style={[styles.ctrlIcon, { color: iconColor }]}>{icon}</Text>
       </View>
-      {sublabel && <Text style={s.ctrlSublabel}>{sublabel}</Text>}
-      <Text
-        style={[
-          s.ctrlLabel,
-          state === "off" && { color: C.red },
-          state === "danger" && { color: C.red },
-        ]}
-        numberOfLines={1}
-      >
+      {sublabel && (
+        <Text style={[styles.ctrlSublabel, { color: colors.text.tertiary }]}>
+          {sublabel}
+        </Text>
+      )}
+      <Text style={[styles.ctrlLabel, { color: labelColor }]} numberOfLines={1}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-
-  // Loader
-  loader: {
-    flex: 1,
-    backgroundColor: C.bg,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-  },
-  loaderText: { color: C.textMid, fontSize: 15, fontWeight: "500" },
-
-  // Top bar
-  topBarWrap: {
-    backgroundColor: C.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
+// ─── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  loader: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
+  loaderText: { fontSize: 15, fontWeight: "500" },
+  topBarWrap: { borderBottomWidth: 1 },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
-  topLeft: { flexDirection: "row", alignItems: "center", gap: 9, flex: 1 },
-  liveChip: {
+  topLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    backgroundColor: C.greenDim,
-    borderWidth: 0.5,
-    borderColor: "rgba(52,211,153,0.3)",
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
-  liveText: {
-    color: C.green,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.9,
-    fontFamily: MONO,
-  },
-  roomName: { color: C.text, fontSize: 15, fontWeight: "600", flexShrink: 1 },
-  timer: {
-    color: C.textMid,
-    fontSize: 13,
-    fontFamily: MONO,
+    gap: 9,
     flex: 1,
-    textAlign: "center",
+    overflow: "hidden",
   },
+  roomName: { fontSize: 15, fontWeight: "600", flexShrink: 1 },
+  focusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    flexShrink: 1,
+  },
+  focusBadgeText: { fontSize: 12, fontWeight: "600", flexShrink: 1 },
+  focusBadgeClose: { fontSize: 11, fontWeight: "700" },
+  phaseBadge: {
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginHorizontal: 6,
+  },
+  phaseBadgeText: { fontSize: 11, fontWeight: "700" },
+  timer: { fontSize: 13, fontFamily: MONO, flex: 1, textAlign: "center" },
   topRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -800,63 +2669,45 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
   },
   resBadge: {
-    backgroundColor: C.accentDim,
     borderWidth: 0.5,
-    borderColor: "rgba(79,120,241,0.4)",
     borderRadius: 5,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  resBadgeText: {
-    color: C.accent,
-    fontSize: 10,
-    fontWeight: "700",
-    fontFamily: MONO,
-  },
+  resBadgeText: { fontSize: 10, fontWeight: "700", fontFamily: MONO },
   participantsBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: C.surfaceHigh,
     borderRadius: 8,
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderWidth: 0.5,
-    borderColor: C.border,
   },
-  participantsBtnIcon: { fontSize: 14, color: C.text },
-  participantsBtnCount: { color: C.text, fontSize: 13, fontWeight: "700" },
-
-  // Grid
-  gridWrap: { flex: 1, backgroundColor: C.bg },
+  participantsBtnCount: { fontSize: 13, fontWeight: "700" },
+  gridWrap: { flex: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
-  emptyIcon: { fontSize: 44, color: C.surfaceHigh, marginBottom: 4 },
-  emptyTitle: { color: C.textMid, fontSize: 17, fontWeight: "600" },
-  emptySub: { color: C.textDim, fontSize: 13 },
-
-  // Tile
-  tile: {
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: C.surface,
-    borderWidth: 1.5,
-    borderColor: C.borderFaint,
-  },
-  tileSpeaking: {
-    borderColor: C.green,
-    shadowColor: C.green,
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+  emptyIcon: { fontSize: 44, marginBottom: 4 },
+  emptyTitle: { fontSize: 17, fontWeight: "600" },
+  emptySub: { fontSize: 13 },
+  tile: { overflow: "hidden" },
   tileOverlay: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    height: 32,
+  },
+  PersonTile: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderColor: "#7e7e7e",
+    alignItems: "center",
+    borderRadius: 5,
   },
   tileBottom: {
     position: "absolute",
@@ -872,32 +2723,95 @@ const s = StyleSheet.create({
   tileAvatar: {
     width: 22,
     height: 22,
+    marginRight: 5,
     borderRadius: 11,
-    backgroundColor: C.accent,
     alignItems: "center",
     justifyContent: "center",
   },
   tileAvatarText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-  tileName: { color: C.text, fontSize: 12, fontWeight: "500", flex: 1 },
-  mutedPill: {
-    backgroundColor: C.redDim,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  mutedPillText: {
-    color: C.red,
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-  },
+  tileName: { fontSize: 12, fontWeight: "500", marginRight: "auto" },
+  mutedPill: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  mutedPillText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.4 },
   bars: { flexDirection: "row", alignItems: "flex-end", gap: 2 },
-  bar: { width: 3, backgroundColor: C.green, borderRadius: 2 },
-
-  // Sidebar shell
+  bar: { width: 3, borderRadius: 2 },
+  camOffOverlay: { alignItems: "center", justifyContent: "center", gap: 8 },
+  camOffAvatar: { alignItems: "center", justifyContent: "center" },
+  camOffAvatarText: { fontWeight: "700" },
+  camOffName: { fontWeight: "600", maxWidth: "80%" },
+  camOffBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  camOffBadgeText: { fontSize: 10, fontWeight: "700" },
+  tileMenuBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 6,
+    padding: 6,
+  },
+  tileMenuDots: { gap: 3, alignItems: "center" },
+  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#fff" },
+  menuBackdrop: { flex: 1, justifyContent: "flex-end" },
+  menuSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    paddingBottom: 28,
+    overflow: "hidden",
+  },
+  menuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  menuAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  menuTitle: { fontSize: 16, fontWeight: "700", flex: 1 },
+  menuDivider: { height: 1, marginBottom: 6 },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  menuItemCancel: { marginTop: 6, borderTopWidth: 1 },
+  menuItemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuItemText: { flex: 1, gap: 2 },
+  menuItemLabel: { fontSize: 15, fontWeight: "600" },
+  menuItemSub: { fontSize: 12 },
+  menuCancelText: {
+    fontSize: 15,
+    fontWeight: "500",
+    textAlign: "center",
+    flex: 1,
+  },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 10,
   },
   sidebarShell: {
@@ -908,12 +2822,7 @@ const s = StyleSheet.create({
     width: SIDEBAR_W,
     zIndex: 20,
   },
-  sidebar: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderLeftWidth: 1,
-    borderLeftColor: C.border,
-  },
+  sidebar: { flex: 1, borderLeftWidth: 1 },
   sidebarHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -921,26 +2830,22 @@ const s = StyleSheet.create({
     paddingVertical: 16,
     gap: 10,
   },
-  sidebarTitle: { color: C.text, fontSize: 17, fontWeight: "700", flex: 1 },
+  sidebarTitle: { fontSize: 17, fontWeight: "700", flex: 1 },
   sidebarCountChip: {
-    backgroundColor: C.accentDim,
     borderRadius: 10,
     paddingHorizontal: 9,
     paddingVertical: 3,
   },
-  sidebarCountText: { color: C.accent, fontSize: 12, fontWeight: "700" },
+  sidebarCountText: { fontSize: 12, fontWeight: "700" },
   sidebarCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: C.surfaceHigh,
     alignItems: "center",
     justifyContent: "center",
   },
-  sidebarCloseIcon: { color: C.textMid, fontSize: 14, fontWeight: "600" },
-  divider: { height: 1, backgroundColor: C.border },
-
-  // Participant row
+  sidebarCloseIcon: { fontSize: 14, fontWeight: "600" },
+  divider: { height: 1 },
   pRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -948,34 +2853,22 @@ const s = StyleSheet.create({
     paddingVertical: 13,
     gap: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: C.borderFaint,
   },
   pAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: C.accent,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "transparent",
   },
-  pAvatarSpeaking: { borderColor: C.green },
   pAvatarText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   pInfo: { flex: 1, gap: 2 },
-  pName: { color: C.text, fontSize: 14, fontWeight: "600" },
-  pStatus: { color: C.textDim, fontSize: 12 },
+  pName: { fontSize: 14, fontWeight: "600" },
+  pStatus: { fontSize: 12 },
   pBadge: { borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4 },
-  pBadgeOn: { backgroundColor: C.greenDim },
-  pBadgeOff: { backgroundColor: C.redDim },
   pBadgeText: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
-
-  // Control bar
-  ctrlWrap: {
-    backgroundColor: C.surface,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-  },
+  ctrlWrap: { borderTopWidth: 1 },
   controlBar: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -988,30 +2881,116 @@ const s = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: C.surfaceHigh,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: C.border,
   },
-  ctrlCircleOff: {
-    backgroundColor: C.redDim,
-    borderColor: "rgba(243,96,96,0.28)",
-  },
-  ctrlCircleDanger: { backgroundColor: C.red, borderColor: C.red },
-  ctrlIcon: { fontSize: 18, color: C.text, includeFontPadding: false },
+  ctrlIcon: { fontSize: 18, includeFontPadding: false },
   ctrlSublabel: {
-    color: C.textDim,
     fontSize: 9,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase",
     marginBottom: -3,
   },
-  ctrlLabel: {
-    color: C.textMid,
-    fontSize: 11,
-    fontWeight: "500",
-    textAlign: "center",
+  ctrlLabel: { fontSize: 11, fontWeight: "500", textAlign: "center" },
+  cubicleOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    justifyContent: "flex-end",
   },
+  cubicleBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.75)",
+  },
+  cubicleContainer: {
+    height: SCREEN_H * 0.6,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "#000",
+  },
+  cubicleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    gap: 10,
+    zIndex: 2,
+  },
+  cubicleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  cubicleBadgeText: { fontSize: 11, fontWeight: "700", fontFamily: MONO },
+  cubicleTimer: { flex: 1, textAlign: "center", fontSize: 13 },
+  cubicleEndBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  cubicleEndText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  cubicleMainVideo: { flex: 1, backgroundColor: "#000" },
+  cubiclePartnerVideo: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  cubicleAvatarFallback: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  cubiclePip: {
+    position: "absolute",
+    bottom: 16,
+    right: 16,
+    width: 90,
+    height: 130,
+    borderRadius: 12,
+    borderWidth: 2,
+    zIndex: 5,
+  },
+  videoFill: { flex: 1, width: "100%", height: "100%" },
+  cubicleTileBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    zIndex: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  cubicleTileBadgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "700",
+    fontFamily: MONO,
+  },
+  pageDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    height: 28,
+  },
+  pageDot: { height: 7, borderRadius: 3.5 },
 });

@@ -1,0 +1,65 @@
+"filename", "language", "TypeScript JSX", "TypeScript", "JSON with Comments", "JSON", "Markdown", "XML", "JavaScript", "comment", "blank", "total"
+"/home/anonymous/Documents/Projects/SkillHive-mobile/README.md", "Markdown", 0, 0, 0, 0, 31, 0, 0, 0, 20, 51
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app.json", "JSON with Comments", 0, 0, 58, 0, 0, 0, 0, 0, 1, 59
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/(auth)/_layout.tsx", "TypeScript JSX", 13, 0, 0, 0, 0, 0, 0, 0, 2, 15
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/(auth)/index.tsx", "TypeScript JSX", 221, 0, 0, 0, 0, 0, 0, 0, 15, 236
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/(auth)/sign-in.tsx", "TypeScript JSX", 263, 0, 0, 0, 0, 0, 0, 17, 22, 302
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/(auth)/sign-up.tsx", "TypeScript JSX", 263, 0, 0, 0, 0, 0, 0, 17, 22, 302
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/+not-found.tsx", "TypeScript JSX", 27, 0, 0, 0, 0, 0, 0, 0, 4, 31
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/_layout.tsx", "TypeScript JSX", 60, 0, 0, 0, 0, 0, 0, 3, 10, 73
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/course/_layout.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 1, 1
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/course/index.tsx", "TypeScript JSX", 26, 0, 0, 0, 0, 0, 0, 0, 3, 29
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/index.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 1, 1
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/_layout.tsx", "TypeScript JSX", 88, 0, 0, 0, 0, 0, 0, 1, 14, 103
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/chat.tsx", "TypeScript JSX", 19, 0, 0, 0, 0, 0, 0, 0, 3, 22
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/index.tsx", "TypeScript JSX", 488, 0, 0, 0, 0, 0, 0, 13, 35, 536
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/learn.tsx", "TypeScript JSX", 71, 0, 0, 0, 0, 0, 0, 1, 6, 78
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/profile.tsx", "TypeScript JSX", 330, 0, 0, 0, 0, 0, 0, 2, 47, 379
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/main/tabs.tsx", "TypeScript JSX", 164, 0, 0, 0, 0, 0, 0, 4, 15, 183
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/rooms/[roomName].tsx", "TypeScript JSX", 2369, 0, 0, 0, 0, 0, 0, 50, 125, 2544
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/settings/index.tsx", "TypeScript JSX", 236, 0, 0, 0, 0, 0, 0, 0, 10, 246
+"/home/anonymous/Documents/Projects/SkillHive-mobile/app/settings/username.tsx", "TypeScript JSX", 182, 0, 0, 0, 0, 0, 0, 0, 25, 207
+"/home/anonymous/Documents/Projects/SkillHive-mobile/assets/images/right-arrow.svg", "XML", 0, 0, 0, 0, 0, 8, 0, 1, 0, 9
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/CustomAlert.tsx", "TypeScript JSX", 189, 0, 0, 0, 0, 0, 0, 11, 20, 220
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/CustomLoading.tsx", "TypeScript JSX", 68, 0, 0, 0, 0, 0, 0, 9, 11, 88
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/GroupedNotificationCard.tsx", "TypeScript JSX", 186, 0, 0, 0, 0, 0, 0, 24, 18, 228
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/SignOutButton.tsx", "TypeScript JSX", 36, 0, 0, 0, 0, 0, 0, 5, 7, 48
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Avatar.tsx", "TypeScript JSX", 129, 0, 0, 0, 0, 0, 0, 11, 15, 155
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Button.tsx", "TypeScript JSX", 171, 0, 0, 0, 0, 0, 0, 0, 17, 188
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Card.tsx", "TypeScript JSX", 48, 0, 0, 0, 0, 0, 0, 7, 7, 62
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/CharCounterRing.tsx", "TypeScript JSX", 100, 0, 0, 0, 0, 0, 0, 21, 12, 133
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/CourseCard.tsx", "TypeScript JSX", 286, 0, 0, 0, 0, 0, 0, 0, 10, 296
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/EditFieldModal.tsx", "TypeScript JSX", 208, 0, 0, 0, 0, 0, 0, 7, 16, 231
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/EmptySpace.tsx", "TypeScript JSX", 69, 0, 0, 0, 0, 0, 0, 8, 6, 83
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/IconButton.tsx", "TypeScript JSX", 136, 0, 0, 0, 0, 0, 0, 8, 13, 157
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/MenuItem.tsx", "TypeScript JSX", 93, 0, 0, 0, 0, 0, 0, 0, 12, 105
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ProfileImageEditButton.tsx", "TypeScript JSX", 76, 0, 0, 0, 0, 0, 0, 4, 10, 90
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ProfileProjects.tsx", "TypeScript JSX", 415, 0, 0, 0, 0, 0, 0, 23, 52, 490
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/ProfileStatItem.tsx", "TypeScript JSX", 71, 0, 0, 0, 0, 0, 0, 0, 11, 82
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Skeleton.tsx", "TypeScript JSX", 54, 0, 0, 0, 0, 0, 0, 6, 8, 68
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/StatCard.tsx", "TypeScript JSX", 71, 0, 0, 0, 0, 0, 0, 0, 7, 78
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Surface.tsx", "TypeScript JSX", 103, 0, 0, 0, 0, 0, 0, 0, 16, 119
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Text.tsx", "TypeScript JSX", 68, 0, 0, 0, 0, 0, 0, 0, 12, 80
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/Textfield.tsx", "TypeScript JSX", 126, 0, 0, 0, 0, 0, 0, 16, 12, 154
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/VerifiedBadge.tsx", "TypeScript JSX", 126, 0, 0, 0, 0, 0, 0, 16, 12, 154
+"/home/anonymous/Documents/Projects/SkillHive-mobile/components/ui/WorkRoomCard.tsx", "TypeScript JSX", 497, 0, 0, 0, 0, 0, 0, 42, 108, 647
+"/home/anonymous/Documents/Projects/SkillHive-mobile/constants/colors.ts", "TypeScript", 0, 42, 0, 0, 0, 0, 0, 13, 4, 59
+"/home/anonymous/Documents/Projects/SkillHive-mobile/constants/tokens.ts", "TypeScript", 0, 250, 0, 0, 0, 0, 0, 62, 14, 326
+"/home/anonymous/Documents/Projects/SkillHive-mobile/eas.json", "JSON with Comments", 0, 0, 9, 0, 0, 0, 0, 0, 1, 10
+"/home/anonymous/Documents/Projects/SkillHive-mobile/eslint.config.js", "JavaScript", 0, 0, 0, 0, 0, 0, 8, 1, 2, 11
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/profileContext.tsx", "TypeScript JSX", 140, 0, 0, 0, 0, 0, 0, 0, 27, 167
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useActiveRooms.ts", "TypeScript", 0, 51, 0, 0, 0, 0, 0, 1, 11, 63
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useCurrentUser.ts", "TypeScript", 0, 29, 0, 0, 0, 0, 0, 0, 9, 38
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useCustomAlert.ts", "TypeScript", 0, 191, 0, 0, 0, 0, 0, 19, 18, 228
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useRoomPresence.ts", "TypeScript", 0, 107, 0, 0, 0, 0, 0, 0, 20, 127
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useRoute.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 1, 1
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useSignOut.ts", "TypeScript", 0, 42, 0, 0, 0, 0, 0, 0, 6, 48
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useSocialAuth.ts", "TypeScript", 0, 58, 0, 0, 0, 0, 0, 0, 13, 71
+"/home/anonymous/Documents/Projects/SkillHive-mobile/hooks/useTheme.ts", "TypeScript", 0, 40, 0, 0, 0, 0, 0, 14, 6, 60
+"/home/anonymous/Documents/Projects/SkillHive-mobile/lib/supabase.ts", "TypeScript", 0, 36, 0, 0, 0, 0, 0, 3, 6, 45
+"/home/anonymous/Documents/Projects/SkillHive-mobile/package-lock.json", "JSON", 0, 0, 0, 14090, 0, 0, 0, 0, 1, 14091
+"/home/anonymous/Documents/Projects/SkillHive-mobile/package.json", "JSON", 0, 0, 0, 67, 0, 0, 0, 0, 1, 68
+"/home/anonymous/Documents/Projects/SkillHive-mobile/tsconfig.json", "JSON with Comments", 0, 0, 17, 0, 0, 0, 0, 0, 1, 18
+"/home/anonymous/Documents/Projects/SkillHive-mobile/types/index.ts", "TypeScript", 0, 87, 0, 0, 0, 0, 0, 32, 10, 129
+"/home/anonymous/Documents/Projects/SkillHive-mobile/utils/formatter.ts", "TypeScript", 0, 55, 0, 0, 0, 0, 0, 9, 11, 75
+"Total", "-", 8286, 988, 84, 14157, 31, 8, 8, 481, 955, 24998
