@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-
+import * as Haptics from "expo-haptics";2
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
+import { Heart, MessageCircle } from "lucide-react-native";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -76,6 +77,7 @@ export default function ActionRow({
     if (liked) {
       // Optimistic update
       setLiked(false);
+
       setLikeCount((c) => Math.max(c - 1, 0));
 
       const { error } = await supabase
@@ -104,6 +106,7 @@ export default function ActionRow({
         setLikeCount((c) => Math.max(c - 1, 0));
       }
     }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
 
     setLoading(false);
   }, [liked, loading, postId]);
@@ -147,13 +150,14 @@ export default function ActionRow({
       >
         <Text
           style={{
-            fontSize: 16,
+            fontSize: 12,
             // filled heart when liked, outline when not
             color: liked ? "#ef4444" : colors.text.tertiary,
             opacity: loading ? 0.5 : 1,
           }}
         >
-          {liked ? "♥" : "♡"}
+          {/* {liked ? "♥" : "♡"} */}
+          <Heart size={16} fill={liked ? "#ef4444" : "transparent"} color={liked ? "#ef4444" : colors.text.tertiary} />
         </Text>
         <Text
           style={{
@@ -187,7 +191,7 @@ export default function ActionRow({
             color: colors.text.tertiary,
           }}
         >
-          💬
+          <MessageCircle size={16} color={colors.text.tertiary} />
         </Text>
         <Text
           style={{

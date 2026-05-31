@@ -21,7 +21,7 @@ export function Header() {
         {
           paddingTop: insets.top,
           height: HEADER_HEIGHT + insets.top,
-          backgroundColor: colors.bg.elevated,
+          backgroundColor: "transparent",
         },
       ]}
     >

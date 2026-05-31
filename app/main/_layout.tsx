@@ -14,6 +14,8 @@ const PagerView =
 import feedScreen from "./feedScreen";
 import HomeScreen from "./index";
 import ProfileScreen from "./profile";
+import { Colors } from "react-native/Libraries/NewAppScreen";
+import { useTheme } from "@/hooks/useTheme";
 
 const ROUTES = [
   { name: "index", title: "Home", component: HomeScreen },
@@ -26,6 +28,7 @@ export default function Layout() {
   const insets = useSafeAreaInsets();
 
   const pagerRef = useRef<any>(null);
+  const { colors } = useTheme();
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -88,7 +91,7 @@ export default function Layout() {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
       {/* Global Header */}
       <Header />
 

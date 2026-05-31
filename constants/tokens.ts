@@ -112,7 +112,7 @@ export const storyRingGradient = [
 // Semantic palette contract.
 // ─────────────────────────────────────────────────────────────────────────
 export interface ColorPalette {
-  bg: { canvas: string; elevated: string; muted: string };
+  bg: { canvas: string; elevated: string; muted: string, primary: string, accentDim: string };
   navbar: { text: string; activeText: string };
   surface: {
     primary: string;
@@ -131,7 +131,7 @@ export interface ColorPalette {
     white: string;
     skillhive: string;
   };
-  border: { subtle: string; strong: string; focus: string; primary: string };
+  border: { subtle: string; strong: string; focus: string; primary: string, default: string };
   tint: {
     primary: string;
     primaryStrong: string;
@@ -162,10 +162,12 @@ export const lightPalette: ColorPalette = {
     canvas: "#FFFFFF",
     elevated: "#FFFFFF",
     muted: "#F4F4F6",
+    primary: "#ffffff",
+    accentDim: "#fdf8e7"
   },
   surface: {
     primary: "#FFFFFF",
-    skillhive: "#FFFD01",
+    skillhive: "#e9a422",
     secondary: "#F6F6F8",
     raised: "#FFFFFF",
     sunken: "#EFEFF3",
@@ -178,13 +180,14 @@ export const lightPalette: ColorPalette = {
     onTint: "#FFFFFF",
     black: "#000000",
     white: "#ffffff",
-    skillhive: "#fffd01",
+    skillhive: "#e9a422",
   },
   border: {
     subtle: "rgba(15,15,18,0.07)",
     strong: "rgba(15,15,18,0.14)",
     focus: brand.coral,
-    primary: "#fffd01",
+    primary: "#e9a422",
+    default: "#e0e0e0"
   },
   tint: {
     primary: brand.coral,
@@ -217,8 +220,10 @@ export const darkPalette: ColorPalette = {
   },
   bg: {
     canvas: "#1f1f1f",
-    elevated: "#0E0E12",
+    elevated: "#0e0e121c",
     muted: "#15151B",
+    primary: "#0A0A0A",
+    accentDim: "#24280B"
   },
   surface: {
     primary: "#0E0E12",
@@ -242,6 +247,7 @@ export const darkPalette: ColorPalette = {
     strong: "rgba(255,255,255,0.18)",
     focus: brand.coralSoft,
     primary: "#fffd01",
+    default: "#343434"
   },
   tint: {
     primary: brand.coral,

@@ -1,4 +1,6 @@
 import { useTheme } from "@/hooks/useTheme";
+import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
 import React, { useLayoutEffect, useRef } from "react";
 import {
   LayoutRectangle,
@@ -71,10 +73,17 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
     width: width.value,
   }));
 
+  const navigate = (query: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    navigation.navigate(query);
+  }
+
   return (
     <View style={styles.nav}>
-      <View style={[styles.container, { backgroundColor: colors.bg.elevated }]}>
-        <Animated.View style={[styles.pill, pillStyle]} />
+      <View style={{ borderRadius: 30, overflow: "hidden" }}>
+    <BlurView style={{ borderRadius: 50 }} intensity={80}>
+      <View style={[styles.container, { backgroundColor: colors.bg.elevated, borderColor: colors.border.default }]}>
+        <Animated.View style={[styles.pill, pillStyle, {    backgroundColor: colors.surface.skillhive,}]} />
 
         {tabs.map((tab, i) => {
           const isFocused = state.routes[state.index]?.name === tab.name;
@@ -87,7 +96,7 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
           return (
             <Pressable
               key={tab.name}
-              onPress={() => navigation.navigate(tab.name)}
+              onPress={() => navigate(tab.name)}
               onLayout={(e) => {
                 layouts.current[i] = e.nativeEvent.layout;
                 // Once all layouts measured, snap pill to initial tab
@@ -126,6 +135,8 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
           );
         })}
       </View>
+      </BlurView>
+      </View>
     </View>
   );
 };
@@ -137,26 +148,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: "absolute",
-    bottom: 15,
+    bottom: 0,
+    left: 10,
+    right: 10,
     zIndex: 999,
-    margin: 10,
+    margin: 20,
     elevation: 10,
   },
   container: {
-    flex: 1,
-    borderColor: "#343434",
     borderWidth: 1,
     flexDirection: "row",
     borderRadius: 30,
     padding: 2,
-    justifyContent: "space-evenly",
     paddingHorizontal: 5,
   },
   tab: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 24,
     paddingVertical: 5,
     zIndex: 2,
-    flex: 1,
+    fontSize: 20,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -166,15 +176,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 6,
-    paddingHorizontal: 18,
+    paddingHorizontal: 4,
     flex: 11,
   },
-  icon: { fontSize: 20 },
-  text: { fontSize: 10, marginTop: 4, fontWeight: "500" },
+  icon: { fontSize: 24 },
+  text: { fontSize: 10, marginTop: 6, fontWeight: "500" },
   pill: {
     position: "absolute",
     height: "90%",
-    backgroundColor: "#fffd01",
     borderRadius: 24,
     left: 0,
     top: 5,

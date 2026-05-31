@@ -199,7 +199,7 @@ export default function ProfileProjects({ userId }: { userId: string }) {
           style={{
             fontSize: 18,
             fontWeight: "700",
-            color: colors.text.white,
+            color: colors.text.primary,
           }}
         >
           Projects

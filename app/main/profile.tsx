@@ -1,8 +1,9 @@
 import CustomAlert from "@/components/CustomAlert";
 import MenuItem from "@/components/ui/MenuItem";
-import ProfileImageEditButton from "@/components/ui/ProfileImageEditButton";
 import ProfileProjects from "@/components/ui/ProfileProjects";
 import ProfileStatItem from "@/components/ui/ProfileStatItem";
+import ThemeMenuItem from "@/components/ui/ThemeMenuItem";
+import ThemeSwitcher from "@/components/ui/ThemeSwitcher";
 import { useProfile } from "@/hooks/profileContext";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTheme } from "@/hooks/useTheme";
@@ -10,208 +11,131 @@ import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { ImageBackground } from "expo-image";
 import { useRouter } from "expo-router";
-
 import { useEffect, useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image, KeyboardAvoidingView, Platform,
+  Pressable, ScrollView, StyleSheet, Text, View,
+} from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
-const Profile = () => {
-  const { colors } = useTheme();
-  const { profile, loading, error, updateField } = useProfile();
-  const [user, setUser] = useState<User | null>(null);
+// Single radius token — used everywhere so nothing fights
+const R    = 12;
+const MONO = Platform.OS === "ios" ? "Courier New" : "monospace";
+const EMBER = "#fffd01";
 
-  const { handleSignOut, isSigningOut, alertConfig, isVisible, hideAlert } =
-    useSignOut();
+export default function Profile() {
+  const { colors, mode: themeMode, setThemeMode } = useTheme();
+  const { profile } = useProfile();
+  const [user, setUser] = useState<User | null>(null);
+  const { handleSignOut, isSigningOut, alertConfig, isVisible, hideAlert } = useSignOut();
+  const router = useRouter();
+
+  const BG      = colors?.bg?.primary;
+  const BG_MUT  = colors?.bg?.muted         ?? "#110f0d";
+  const SURFACE = colors?.surface?.secondary ?? "#1a1714";
+  const BORDER  = colors?.border?.subtle     ?? "#3a322c";
+  const INK     = colors?.text?.primary      ?? "#e8e0d5";
+  const INK_MUT = colors?.text?.secondary    ?? "#9a9189";
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-
-    loadUser();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-      },
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: l } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null));
+    return () => l.subscription.unsubscribe();
   }, []);
 
-  const router = useRouter();
   return (
-    <View
-      style={{
-        flex: 1,
-      }}
-    >
-      <View style={{ flex: 1, zIndex: 10, backgroundColor: colors.bg.muted }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: 120,
-          }}
-        >
-          <View style={[styles.header]}>
-            <ImageBackground
-              source={require("@/assets/images/tanjiro.png")}
-              style={{
-                flex: 1,
-              }}
+    <View style={{ flex: 1, backgroundColor: BG_MUT }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
+          {/* ── Banner ── */}
+          <View style={styles.banner}>
+            <ImageBackground source={require("@/assets/images/tanjiro.png")} style={{ flex: 1 }} />
+            <View style={StyleSheet.absoluteFill} pointerEvents="none"
+              // dark scrim so card lifts cleanly
+              // eslint-disable-next-line react-native/no-inline-styles
+              children={<View style={{ flex: 1, backgroundColor: "rgba(10,10,10,0.4)" }} />}
             />
           </View>
+
+          {/* ── Card ── */}
           <Animated.View
-            style={[styles.profileCard, {}]}
-            entering={FadeInUp.duration(200).delay(100)}
+            entering={FadeInUp.duration(260).delay(80)}
+            style={[styles.card, { backgroundColor: BG, borderColor: BORDER }]}
           >
-            <View style={styles.profileTop}>
-              <View
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                }}
-              >
+            {/* avatar + edit profile */}
+            <View style={styles.avatarRow}>
+              <View>
                 <Image
-                  source={{
-                    uri: "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
-                  }}
-                  style={styles.avatar}
+                  source={{ uri: "https://images.unsplash.com/photo-1527980965255-d3b416303d12" }}
+                  style={[styles.avatar, { borderColor: BG }]}
                 />
-                <ProfileImageEditButton
-                  style={{ right: 0, bottom: 0 }}
-                  onPress={() => console.log("profile")}
-                />
+                {/* <ProfileImageEditButton style={styles.avatarEdit} onPress={() => {}} /> */}
               </View>
-            </View>
-            <View
-              style={{
-                display: "flex",
-                flex: 1,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={[
-                  styles.name,
-                  {
-                    color: colors.text.primary,
-                  },
+
+              {/* pill — relational/community action */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.pillBtn,
+                  { borderColor: EMBER, opacity: pressed ? 0.7 : 1 },
                 ]}
+                onPress={() => router.push("/settings/profile")}
               >
-                {profile?.displayname}
-              </Text>
-              <Text
-                style={{ color: colors.text.secondary, marginHorizontal: 10 }}
-              >
+                <Text style={[styles.pillBtnText, { color: EMBER }]}>
+                  Edit Profile
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* name + username */}
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, { color: INK }]}>{profile?.displayname}</Text>
+              <Text style={[styles.username, { color: INK_MUT, fontFamily: MONO }]}>
                 [{profile?.username}]
               </Text>
             </View>
-            <Text
-              style={[
-                styles.email,
-                {
-                  color: colors.text.secondary,
-                },
-              ]}
-            >
-              {profile?.bio ?? "guest@email.com"}
+
+            {/* bio */}
+            <Text style={[styles.bio, { color: INK_MUT }]}>
+              {profile?.bio ?? "No bio yet."}
             </Text>
 
-            <View
-              style={[
-                styles.followContainer,
-                {
-                  backgroundColor: colors.surface.secondary,
-                },
-              ]}
-            >
-              <ProfileStatItem
-                value={profile?.followers || 0}
-                label="Allies"
-                showDivider
-              />
-
-              <ProfileStatItem
-                value={profile?.following || 0}
-                label="Allied With"
-                showDivider
-              />
-
-              <ProfileStatItem value="12" label="Streak" />
+            {/* ── Stats bar ── */}
+            <View style={[styles.statsBar, { backgroundColor: SURFACE, borderColor: BORDER, borderRadius: R }]}>
+              <ProfileStatItem value={profile?.followers || 0} label="Allies"      showDivider />
+              <ProfileStatItem value={profile?.following || 0} label="Allied With" showDivider />
+              <ProfileStatItem value="12"                      label="Streak" />
             </View>
 
-            {/* GRID */}
-            {/* <View style={styles.grid}>
-              <StatCard icon="star" value="51" label="Balance" />
+            {/* ── Projects ── */}
+            {profile?.id && <ProfileProjects userId={profile.id} />}
 
-              <StatCard icon="trophy" value="1" label="Level" />
+            {/* ── Preferences ── */}
+            <View style={[styles.block, { backgroundColor: SURFACE, borderColor: BORDER, borderRadius: R }]}>
+              <Text style={[styles.sectionLabel, { color: colors.text.skillhive }]}>Preferences</Text>
 
-              <StatCard icon="shield" value="Barefoot" label="Current League" />
+<ThemeMenuItem active={themeMode} onChange={setThemeMode} />
 
-              <StatCard icon="bolt" value="30" label="Total XP" />
-              </View> */}
+              <View style={[styles.divider, { backgroundColor: BORDER }]} />
 
-            {/* ACTIONS */}
-              {profile?.id && <ProfileProjects userId={profile.id} />}
-            <View
-              style={[
-                styles.menuContainer,
-                {
-                  backgroundColor: colors.surface.secondary,
-                  borderColor: colors.border.subtle,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.menuTitle,
-                  {
-                    color: colors.text.primary,
-                  },
-                ]}
-              >
-                Preferences
-              </Text>
-
-              <View style={styles.menuList}>
-                <MenuItem
-                  icon="user"
-                  label="Edit Profile"
-                  onPress={() => router.push("/settings")}
-                />
-
-                <MenuItem icon="bell" label="Notifications" />
-
-                <MenuItem icon="shield-halved" label="Privacy & Security" />
-
-                <MenuItem
-                  icon="gear"
-                  label="Settings"
-                  onPress={() => router.push("../settings")}
-                />
-
-                <MenuItem icon="circle-question" label="Help & Support" />
-
-                <MenuItem
-                  icon="right-from-bracket"
-                  label={isSigningOut ? "Logging out..." : "Logout"}
-                  onPress={handleSignOut}
-                  disabled={isSigningOut}
-                  danger
-                />
-              </View>
+              <MenuItem icon="circle-question" label="Help & Support" />
+              <MenuItem
+                icon="right-from-bracket"
+                label={isSigningOut ? "Logging out…" : "Logout"}
+                onPress={handleSignOut}
+                disabled={isSigningOut}
+                danger
+              />
             </View>
+
+            {/* footer */}
+            <Text style={[styles.footerLine, { color: BORDER, fontFamily: MONO }]}>
+              © SkillHiive
+            </Text>
           </Animated.View>
         </ScrollView>
 
-        {alertConfig ? (
+        {alertConfig && (
           <CustomAlert
             visible={isVisible}
             title={alertConfig.title}
@@ -220,158 +144,116 @@ const Profile = () => {
             type={alertConfig.type}
             onDismiss={hideAlert}
           />
-        ) : null}
+        )}
       </KeyboardAvoidingView>
-      </View>
     </View>
   );
-};
-
-export default Profile;
+}
 
 const styles = StyleSheet.create({
-  header: {
-    height: 170,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+  banner: {
+    height: 180,
+    overflow: "hidden",
+  },
+  card: {
+    marginTop: -24,
+    borderTopLeftRadius: R * 2,
+    borderTopRightRadius: R * 2,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    paddingHorizontal: 20,
     paddingTop: 0,
-    zIndex: -1,
+    paddingBottom: 8,
   },
-
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-
-  headerButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  profileCard: {
-    marginHorizontal: 0,
-    marginTop: -70,
-    borderRadius: 28,
-    padding: 20,
-  },
-
-  profileTop: {
+  avatarRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 14,
+    alignItems: "flex-end",
+    marginTop: -40,
+    marginBottom: 16,
   },
-
   avatar: {
     width: 82,
     height: 82,
-    marginHorizontal: 10,
     borderRadius: 41,
+    borderWidth: 3,
   },
-
-  friendButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  avatarEdit: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+  },
+  // pill = community/relational action
+  pillBtn: {
     borderWidth: 1,
-    paddingHorizontal: 12,
+    borderRadius: 0,
+    backgroundColor: "#24280B",
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 999,
+    textAlign: "center"
   },
-
-  friendButtonText: {
-    fontSize: 12,
+  pillBtnText: {
+    fontSize: 11,
     fontWeight: "700",
+    letterSpacing: 1.5,
   },
-
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 6,
+  },
   name: {
     fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
+    fontWeight: "900",
+    letterSpacing: -0.5,
   },
-
-  email: {
+  username: {
     fontSize: 13,
+    fontWeight: "500",
+  },
+  bio: {
+    fontSize: 12,
+    lineHeight: 20,
     marginBottom: 22,
   },
-
-  socialStats: {
+  statsBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 26,
-  },
-
-  socialNumber: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-
-  socialLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  recordButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 14,
+    borderWidth: 1,
+    paddingVertical: 18,
     marginBottom: 24,
   },
-
-  actionsCard: {
-    borderRadius: 22,
+  block: {
     borderWidth: 1,
     padding: 18,
-  },
-
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: "800",
     marginBottom: 20,
-  },
-
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  actionText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  menuContainer: {
-    borderWidth: 1,
-    borderRadius: 28,
-    padding: 18,
-    marginBottom: 22,
-  },
-
-  menuTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 18,
-  },
-
-  menuList: {
     gap: 14,
   },
-  followContainer: {
-    flexDirection: "row",
-    borderRadius: 24,
-    paddingVertical: 18,
-    marginBottom: 28,
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  subLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginBottom: -4,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 2,
+  },
+  footerLine: {
+    fontSize: 9,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 4,
   },
 });

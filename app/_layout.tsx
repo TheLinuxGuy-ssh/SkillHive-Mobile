@@ -2,9 +2,18 @@ import { ProfileProvider } from "@/hooks/profileContext";
 import { supabase } from "@/lib/supabase";
 import { Session } from "@supabase/supabase-js";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ThemeProvider } from "@/hooks/useTheme";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+
+export const unstable_settings = {
+  initialRouteName: "main",
+};
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -16,58 +25,62 @@ export default function RootLayout() {
       setSession(session);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // Only update on meaningful auth changes, not token refreshes
-        if (
-          event === "SIGNED_IN" ||
-          event === "SIGNED_OUT" ||
-          event === "USER_UPDATED"
-        ) {
-          setSession(session);
-        }
-      },
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "USER_UPDATED"
+      ) {
+        setSession(session);
+      }
+    });
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    // Still loading — render nothing to prevent flash
     if (session === undefined) return;
 
     const inAuth = segments[0] === "(auth)";
-    const inMain = segments[0] === "main";
 
-    if (!session && inMain) {
+    if (session === null && !inAuth) {
       router.replace("/(auth)");
-      return;
-    }
-    if (session && inAuth) {
+    } else if (session && inAuth) {
       router.replace("/main");
-      return;
     }
+
+    SplashScreen.hideAsync();
   }, [session, segments]);
 
-  // Block render until session is resolved to prevent route flash
-  if (session === undefined) return <View style={{ flex: 1 }} />;
+  if (session === undefined) {
+    return <View style={{ flex: 1, backgroundColor: "#000000" }} />;
+  }
 
   return (
     <ProfileProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="main" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="course/[id]" />
-          <Stack.Screen name="web" />
-          <Stack.Screen name="profile/[id]" />
-          <Stack.Screen
-            name="rooms/[roomName]"
-            options={{ gestureEnabled: false }}
-          />
-        </Stack>
-      </GestureHandlerRootView>
+      <ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
+          <BottomSheetModalProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "none",
+              }}
+            >
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="main" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="course/[id]" />
+              <Stack.Screen name="web" />
+              <Stack.Screen name="profile/[id]" />
+              <Stack.Screen
+                name="rooms/[roomName]"
+                options={{ gestureEnabled: false }}
+              />
+            </Stack>
+          </BottomSheetModalProvider>
+        </GestureHandlerRootView>
+      </ThemeProvider>
     </ProfileProvider>
   );
 }

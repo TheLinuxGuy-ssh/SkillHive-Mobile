@@ -20,13 +20,12 @@ export default function SectionHeader({ title, subtitle }: Props) {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-
-        backgroundColor: colors.bg.canvas,
+        backgroundColor: colors.bg.muted,
       }}
     >
       <Text
         style={{
-          color: colors.tint.primary,
+          color: colors.text.primary,
 
           fontSize: typography.caption.size,
           lineHeight: typography.caption.lineHeight,
