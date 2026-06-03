@@ -125,11 +125,7 @@ const Index = () => {
   );
 
   return (
-    // ── FIX 2: zIndex + elevation on root so the sheet portal
-    // renders above tab bars and headers. The real fix is wrapping
-    // your root _layout.tsx with <BottomSheetModalProvider> —
-    // see note below this component.
-    <ScreenWithHeader>
+
     <View
       style={{ flex: 1, backgroundColor: colors.bg.muted }}
       onLayout={(e: LayoutChangeEvent) => {
@@ -286,7 +282,6 @@ const Index = () => {
         </BottomSheetView>
       </BottomSheetModal>
     </View>
-    </ScreenWithHeader>
   );
 };
 

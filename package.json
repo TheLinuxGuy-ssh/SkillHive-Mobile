@@ -18,6 +18,7 @@
     "@livekit/react-native": "^2.10.3",
     "@livekit/react-native-webrtc": "^144.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/blur": "^4.4.1",
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",

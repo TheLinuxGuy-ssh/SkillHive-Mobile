@@ -21,15 +21,17 @@ import { router } from "expo-router";
 
 type RawPost = {
   id:             string;
+  user_id:        string;
   post_type:      "project" | "media" | "offer";
   caption:        string | null;
   likes_count:    number;
   comments_count: number;
   created_at:     string;
   profiles: {
+    id: string | null;
     username: string | null;
     avatar:   string | null;
-  } | null;
+  };
   project_posts: {
     title:       string;
     description: string | null;
@@ -61,6 +63,7 @@ const FEED_QUERY = `
   comments_count,
   created_at,
   profiles:profiles!posts_user_id_profiles_fkey (
+    id
     username,
     avatar
   ),
@@ -90,7 +93,8 @@ function toProjectCardData(row: RawPost): ProjectCardData | null {
   const sortedImages = [...(row.post_images ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
   );
-  return {
+  return {  
+    user_id:        row.profiles.id,
     post_id:        row.id,
     caption:        row.caption,
     likes_count:    row.likes_count,
@@ -110,6 +114,7 @@ function toOfferCardData(row: RawPost): OfferCardData | null {
   const op = row.offer_posts;
   if (!op) return null;
   return {
+    user_id:        row.profiles.id,
     post_id:        row.id,
     caption:        row.caption,
     likes_count:    row.likes_count,

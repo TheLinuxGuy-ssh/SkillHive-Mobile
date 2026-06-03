@@ -4,6 +4,8 @@ import { Image, Text, View } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
 import ActionRow from "./ActionRow";
 import FeedCard from "./FeedCard";
+import { Pressable } from "react-native";
+import { useRouter } from "expo-router";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -12,6 +14,7 @@ import FeedCard from "./FeedCard";
 export type ProjectStatus = "active" | "completed" | "paused";
 
 export type ProjectCardData = {
+  user_id:        string;
   post_id:        string;
   caption:        string | null;
   likes_count:    number;
@@ -63,7 +66,7 @@ type Props = {
 
 export default function ProjectCard({ data, onPress }: Props) {
   const { colors, spacing, radii, typography } = useTheme();
-
+  const router = useRouter();
   const statusCfg  = STATUS_CONFIG[data.status];
   const duration   = deriveDuration(data.started_at, data.ended_at);
   const hasDateRange = data.started_at || data.ended_at;
@@ -80,6 +83,7 @@ export default function ProjectCard({ data, onPress }: Props) {
             marginBottom:   spacing.sm,
           }}
         >
+                   <Pressable onPress={() => router.push(`/profile/${data.user_id}`)}>
           {/* Avatar */}
           {data.author_avatar ? (
             <Image
@@ -116,7 +120,7 @@ export default function ProjectCard({ data, onPress }: Props) {
           >
             {data.author_name}
           </Text>
-
+</Pressable>
           {/* ── Type badge — matches OfferCard's badge style ── */}
           <View
             style={{

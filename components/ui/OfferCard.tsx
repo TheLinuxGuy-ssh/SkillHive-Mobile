@@ -1,15 +1,18 @@
 import React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useTheme } from "@/hooks/useTheme";
 import ActionRow from "./ActionRow";
 import FeedCard from "./FeedCard";
+import { Image } from "expo-image";
+import { router } from "expo-router";
 
 // ─────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────
 
 export type OfferCardData = {
+  user_id:        string;
   post_id:        string;
   caption:        string | null;
   likes_count:    number;
@@ -77,24 +80,31 @@ export default function OfferCard({ data, onPress }: Props) {
             marginBottom:  spacing.sm,
           }}
         >
-          {/* Avatar */}
-          <View
-            style={{
-              width:           32,
-              height:          32,
-              borderRadius:    16,
-              marginRight:     spacing.sm,
-              backgroundColor: colors.tint.success,
-              justifyContent:  "center",
-              alignItems:      "center",
-            }}
-          >
-            <Text style={{ color: colors.text.white, fontWeight: "700", fontSize: 12 }}>
-              {initials}
-            </Text>
-          </View>
-
-          {/* Name + time */}
+         {/* Avatar */}
+         <Pressable onPress={() => router.push(`/profile/${data.user_id}`)}>
+                   {data.author_avatar ? (
+                     <Image
+                       source={{ uri: data.author_avatar }}
+                       style={{
+                         width: 32, height: 32, borderRadius: 16,
+                         marginRight: spacing.sm,
+                         backgroundColor: colors.surface.secondary,
+                       }}
+                     />
+                   ) : (
+                     <View
+                       style={{
+                         width: 32, height: 32, borderRadius: 16,
+                         marginRight: spacing.sm,
+                         backgroundColor: colors.surface.secondary,
+                         justifyContent: "center", alignItems: "center",
+                       }}
+                     >
+                       <Text style={{ color: colors.text.tertiary, fontSize: 13, fontWeight: "600" }}>
+                         {data.author_name?.[0]?.toUpperCase() ?? "?"}
+                       </Text>
+                     </View>
+                   )}
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text.secondary, fontSize: typography.bodySm.size, fontWeight: "600" }}>
               {data.author_name}
@@ -103,6 +113,7 @@ export default function OfferCard({ data, onPress }: Props) {
               {timeLabel}
             </Text>
           </View>
+          </Pressable>
 
           {/* ── Type badge — same style as ProjectCard's badge ── */}
           <View

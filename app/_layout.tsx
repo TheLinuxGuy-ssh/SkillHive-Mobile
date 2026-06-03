@@ -1,3 +1,13 @@
+/**
+ * app/_layout.tsx
+ *
+ * Changes from original:
+ *  1. Wrap everything in <RoomSessionProvider>  (◆ PiP)
+ *  2. Render <GlobalPiPWindow /> as a floating sibling of <Stack>  (◆ PiP)
+ *
+ * Search "◆ PiP" for every touched line.
+ */
+
 import { ProfileProvider } from "@/hooks/profileContext";
 import { supabase } from "@/lib/supabase";
 import { Session } from "@supabase/supabase-js";
@@ -9,6 +19,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
+// ◆ PiP
+import { RoomSessionProvider } from "@/hooks/RoomSessionContext";
+import { GlobalPiPWindow } from "@/components/GlobalPiPWindow";
+
 export const unstable_settings = {
   initialRouteName: "main",
 };
@@ -17,7 +31,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const router = useRouter();
+  const router   = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
@@ -59,27 +73,33 @@ export default function RootLayout() {
   return (
     <ProfileProvider>
       <ThemeProvider>
-        <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
-          <BottomSheetModalProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: "none",
-              }}
-            >
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="main" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="course/[id]" />
-              <Stack.Screen name="web" />
-              <Stack.Screen name="profile/[id]" />
-              <Stack.Screen
-                name="rooms/[roomName]"
-                options={{ gestureEnabled: false }}
-              />
-            </Stack>
-          </BottomSheetModalProvider>
-        </GestureHandlerRootView>
+        {/* ◆ PiP — RoomSessionProvider wraps everything so any screen can read room state */}
+        <RoomSessionProvider>
+          <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
+            <BottomSheetModalProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  animation: "none",
+                }}
+              >
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="main" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="course/[id]" />
+                <Stack.Screen name="web" />
+                <Stack.Screen name="profile/[id]" />
+                <Stack.Screen
+                  name="rooms/[roomName]"
+                  options={{ gestureEnabled: false }}
+                />
+              </Stack>
+
+              {/* ◆ PiP — global floating window; renders above the Stack, below nothing */}
+              <GlobalPiPWindow />
+            </BottomSheetModalProvider>
+          </GestureHandlerRootView>
+        </RoomSessionProvider>
       </ThemeProvider>
     </ProfileProvider>
   );

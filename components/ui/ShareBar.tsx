@@ -312,7 +312,7 @@ export default function ShareBar({ initials = "ME", onPosted }: Props) {
     style={{
       flex: 1,
       color: colors.text.tertiary,
-      fontSize: typography.body.size,
+      fontSize: 13,
       marginHorizontal: 10
     }}
   >

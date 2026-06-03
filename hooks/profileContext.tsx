@@ -12,14 +12,12 @@ export type Profile = {
   id: string;
   username: string | null;
   avatar: string | null;
+  banner: string | null;
   bio: string | null;
   displayname: string;
   created_at: string;
-  followers: number;
-  following: number;
   email: string;
 };
-
 type ProfileContextValue = {
   profile: Profile | null;
   loading: boolean;
@@ -87,7 +85,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     const { data, error: fetchErr } = await supabase
       .from("profiles")
       .select(
-        "id, username, avatar, bio, displayname, created_at, followers, following",
+        "id, username, avatar, banner, bio, displayname, created_at",
       )
       .eq("id", user.id)
       .single();
@@ -112,7 +110,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       .from("profiles")
       .insert({ id, displayname: email.split("@")[0] })
       .select(
-        "id, username, avatar, bio, displayname, created_at, followers, following",
+        "id, username, avatar, banner, bio, displayname, created_at, followers, following",
       )
       .single();
 

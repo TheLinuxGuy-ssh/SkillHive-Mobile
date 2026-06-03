@@ -1,5 +1,6 @@
 import { useTheme } from "@/hooks/useTheme";
-import { GlassView } from "expo-glass-effect";
+import { BlurView } from "@react-native-community/blur";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
 import React, { useLayoutEffect, useRef } from "react";
 import {
@@ -9,9 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -26,19 +25,15 @@ const tabs = [
   { name: "profile", label: "Profile", icon: "user" },
 ];
 
-const SPRING = { damping: 220, stiffness: 4020 };
-
 export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
-  // Use a plain object keyed by index — avoids any array mutation issues
-  const layouts = useRef<Record<number, LayoutRectangle>>({});
+  const layouts = useRef<LayoutRectangle[]>([]);
   const { colors } = useTheme();
-
+  const isGlassSupported = isLiquidGlassAvailable();
   const translateX = useSharedValue(0);
   const width = useSharedValue(0);
-  const pillBaseX = useSharedValue(0);
-
   const heights = tabs.map((_, i) => useSharedValue(i === 0 ? 0 : 20));
 
+  // Register scroll handler — fires every frame during swipe, no state involved
   useLayoutEffect(() => {
     if (!onScrollRef) return;
     onScrollRef.current = (position: number, offset: number) => {
@@ -46,12 +41,14 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
       const toLayout = layouts.current[position + 1] ?? fromLayout;
       if (!fromLayout || !toLayout) return;
 
+      // Interpolate x and width between the two tabs in real time
       translateX.value = fromLayout.x + (toLayout.x - fromLayout.x) * offset;
       width.value =
         fromLayout.width + (toLayout.width - fromLayout.width) * offset;
     };
   }, [onScrollRef]);
 
+  // Snap pill and animate labels when page settles
   useLayoutEffect(() => {
     const activeIndex = tabs.findIndex(
       (t) => t.name === state.routes[state.index]?.name,
@@ -60,9 +57,11 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
 
     const layout = layouts.current[activeIndex];
     if (layout) {
-      translateX.value = withSpring(layout.x, SPRING);
-      width.value = withSpring(layout.width, SPRING);
-      pillBaseX.value = layout.x;
+      translateX.value = withSpring(layout.x, {
+        damping: 220,
+        stiffness: 4020,
+      });
+      width.value = withSpring(layout.width, { damping: 220, stiffness: 4020 });
     }
 
     heights.forEach((h, i) => {
@@ -76,129 +75,136 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
   }));
 
   const navigate = (query: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     navigation.navigate(query);
-  };
-
-  const snapToNearestTab = (currentX: number): number => {
-    "worklet";
-    let nearestIndex = 0;
-    let minDist = Infinity;
-    for (let i = 0; i < tabs.length; i++) {
-      const layout = layouts.current[i];
-      if (!layout) continue;
-      const center = layout.x + layout.width / 2;
-      const dist = Math.abs(currentX + width.value / 2 - center);
-      if (dist < minDist) {
-        minDist = dist;
-        nearestIndex = i;
-      }
-    }
-    return nearestIndex;
-  };
-
-  const dragGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      const first = layouts.current[0];
-      const last = layouts.current[tabs.length - 1];
-      if (!first || !last) return;
-
-      const minX = first.x;
-      const maxX = last.x + last.width - width.value;
-      translateX.value = Math.max(minX, Math.min(maxX, pillBaseX.value + e.translationX));
-    })
-    .onEnd(() => {
-      const targetIndex = snapToNearestTab(translateX.value);
-      const targetLayout = layouts.current[targetIndex];
-      if (!targetLayout) return;
-
-      translateX.value = withSpring(targetLayout.x, SPRING);
-      width.value = withSpring(targetLayout.width, SPRING);
-      pillBaseX.value = targetLayout.x;
-
-      const tabName = tabs[targetIndex]?.name;
-      if (tabName && tabName !== tabs[state.index]?.name) {
-        runOnJS(navigate)(tabName);
-      }
-    });
-
-  const measuredCount = useRef(0);
-
-  return (
+  }
+  if(!isGlassSupported) {
+    return (
     <View style={styles.nav}>
       <View style={{ borderRadius: 30, overflow: "hidden" }}>
-        <GlassView>
-          <GestureDetector gesture={dragGesture}>
-            <View
-              style={[
-                styles.container,
-                {
-                  backgroundColor: colors.bg.transparency,
-                  borderColor: colors.border.default,
-                },
-              ]}
+<BlurView style={{ borderRadius: 30 }} blurType="dark" blurAmount={12} overlayColor="transparent">
+        <View style={[styles.container, { backgroundColor: colors.bg.elevated, borderColor: colors.border.default }]}>
+        <Animated.View style={[styles.pill, pillStyle, {    backgroundColor: colors.surface.skillhive,}]} />
+
+        {tabs.map((tab, i) => {
+          const isFocused = state.routes[state.index]?.name === tab.name;
+
+          const textStyle = useAnimatedStyle(() => ({
+            height: heights[i].value,
+            overflow: "hidden",
+          }));
+
+          return (
+            <Pressable
+              key={tab.name}
+              onPress={() => navigate(tab.name)}
+              onLayout={(e) => {
+                layouts.current[i] = e.nativeEvent.layout;
+                // Once all layouts measured, snap pill to initial tab
+                if (layouts.current.filter(Boolean).length === tabs.length) {
+                  const layout = layouts.current[state.index];
+                  if (layout) {
+                    translateX.value = layout.x;
+                    width.value = layout.width;
+                  }
+                }
+              }}
+              style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
             >
-              <Animated.View
-                style={[
-                  styles.pill,
-                  pillStyle,
-                  { backgroundColor: colors.surface.skillhive },
-                ]}
-              />
-
-              {tabs.map((tab, i) => {
-                const isFocused = state.routes[state.index]?.name === tab.name;
-
-                const textStyle = useAnimatedStyle(() => ({
-                  height: heights[i].value,
-                  overflow: "hidden",
-                }));
-
-                return (
-                  <Pressable
-                    key={tab.name}
-                    onPress={() => navigate(tab.name)}
-                    onLayout={(e) => {
-                      // Plain property assignment on a plain object — never throws
-                      layouts.current = {
-                        ...layouts.current,
-                        [i]: e.nativeEvent.layout,
-                      };
-                      measuredCount.current += 1;
-                      if (measuredCount.current >= tabs.length) {
-                        const layout = layouts.current[state.index];
-                        if (layout) {
-                          translateX.value = layout.x;
-                          width.value = layout.width;
-                          pillBaseX.value = layout.x;
-                        }
-                      }
-                    }}
-                    style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
+              <Animated.View style={styles.inner}>
+                <Icon
+                  name={tab.icon}
+                  size={18}
+                  solid
+                  color={
+                    isFocused ? colors.navbar.activeText : colors.navbar.text
+                  }
+                  style={styles.icon}
+                />
+                <Animated.View style={textStyle}>
+                  <Text
+                    style={[
+                      styles.text,
+                      { color: colors.navbar.text, height: 20 },
+                    ]}
                   >
-                    <Animated.View style={styles.inner}>
-                      <Icon
-                        name={tab.icon}
-                        size={18}
-                        solid
-                        color={isFocused ? colors.navbar.activeText : colors.navbar.text}
-                        style={styles.icon}
-                      />
-                      <Animated.View style={textStyle}>
-                        <Text style={[styles.text, { color: colors.navbar.text, height: 20 }]}>
-                          {tab.label}
-                        </Text>
-                      </Animated.View>
-                    </Animated.View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </GestureDetector>
-        </GlassView>
+                    {tab.label}
+                  </Text>
+                </Animated.View>
+              </Animated.View>
+            </Pressable>
+          );
+        })}
+      </View>
+      </BlurView>
       </View>
     </View>
   );
+  } else {
+    return (
+    <View style={styles.nav}>
+      <View style={{ borderRadius: 30, overflow: "hidden" }}>
+    {/* <BlurView style={{ borderRadius: 50 }} intensity={80}> */}
+    <GlassView>
+      <View style={[styles.container, { backgroundColor: colors.bg.elevated, borderColor: colors.border.default }]}>
+        <Animated.View style={[styles.pill, pillStyle, {    backgroundColor: colors.surface.skillhive,}]} />
+
+        {tabs.map((tab, i) => {
+          const isFocused = state.routes[state.index]?.name === tab.name;
+
+          const textStyle = useAnimatedStyle(() => ({
+            height: heights[i].value,
+            overflow: "hidden",
+          }));
+
+          return (
+            <Pressable
+              key={tab.name}
+              onPress={() => navigate(tab.name)}
+              onLayout={(e) => {
+                layouts.current[i] = e.nativeEvent.layout;
+                // Once all layouts measured, snap pill to initial tab
+                if (layouts.current.filter(Boolean).length === tabs.length) {
+                  const layout = layouts.current[state.index];
+                  if (layout) {
+                    translateX.value = layout.x;
+                    width.value = layout.width;
+                  }
+                }
+              }}
+              style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
+            >
+              <Animated.View style={styles.inner}>
+                <Icon
+                  name={tab.icon}
+                  size={18}
+                  solid
+                  color={
+                    isFocused ? colors.navbar.activeText : colors.navbar.text
+                  }
+                  style={styles.icon}
+                />
+                <Animated.View style={textStyle}>
+                  <Text
+                    style={[
+                      styles.text,
+                      { color: colors.navbar.text, height: 20 },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </Animated.View>
+              </Animated.View>
+            </Pressable>
+          );
+        })}
+      </View>
+      </GlassView>
+      {/* </BlurView> */}
+      </View>
+    </View>
+  );
+  }
 };
 
 const styles = StyleSheet.create({
@@ -247,6 +253,5 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     left: 0,
     top: 5,
-    zIndex: 1,
   },
 });

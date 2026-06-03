@@ -18,7 +18,7 @@ type ThemeOption = "light" | "dynamic" | "dark";
 interface Props { active: ThemeOption; onChange: (t: ThemeOption) => void; }
 
 const EMBER       = "#fffd01";
-const ITEM_WIDTH  = 52;
+const ITEM_WIDTH  = 42;
 const ITEM_HEIGHT = 40;
 const PAD         = 3;
 const STEP        = ITEM_WIDTH;
@@ -115,11 +115,11 @@ export default function ThemeSwitcher({ active, onChange }: Props) {
     <GestureDetector gesture={Gesture.Simultaneous(tap, pan)}>
       <View style={[
         styles.container,
-        { borderRadius: R, borderColor: BORDER, backgroundColor: "rgba(157, 157, 95, 0.04)", ...(elevation?.md ?? {}) },
+        { borderRadius: R, borderColor: BORDER, backgroundColor: "rgba(157, 157, 95, 0.04)",  },
       ]}>
         <Animated.View
           pointerEvents="none"
-          style={[styles.pill, { borderRadius: R - 2, backgroundColor: EMBER }, pillStyle]}
+          style={[styles.pill, { borderRadius: R - 2, backgroundColor: colors.surface.skillhive }, pillStyle]}
         />
         {THEMES.map((t, i) => (
           <ThemeItem
@@ -144,6 +144,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    backgroundColor: "#ffffff"
   },
   pill: {
     position: "absolute",

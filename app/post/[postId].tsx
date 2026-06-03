@@ -27,6 +27,7 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
 import { Image } from "expo-image";
+import ActionRow from "@/components/ui/ActionRow";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -539,14 +540,8 @@ const img = [...(post.post_images ?? [])].sort((a, b) => a.sort_order - b.sort_o
           borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
           marginBottom: spacing.lg,
         }}>
-          <Text style={{ color: colors.text.tertiary, fontSize: typography.bodySm.size }}>
-            <Text style={{ color: colors.text.primary, fontWeight: "700" }}>{post.likes_count}</Text>
-            {"  likes"}
-          </Text>
-          <Text style={{ color: colors.text.tertiary, fontSize: typography.bodySm.size }}>
-            <Text style={{ color: colors.text.primary, fontWeight: "700" }}>{post.comments_count}</Text>
-            {"  comments"}
-          </Text>
+
+          <ActionRow postId={post.id} likes={post.likes_count} comments={post.comments_count} />
         </View>
 
         {/* ── Comments heading ── */}
