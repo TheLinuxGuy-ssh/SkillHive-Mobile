@@ -472,7 +472,7 @@ export default function ViewProfile() {
             source={
               viewed.banner
                 ? { uri: viewed.banner }
-                : require("@/assets/images/tanjiro.png")
+                : require("@/assets/images/banner.png")
             }
             style={{ flex: 1 }}
           />
@@ -490,9 +490,11 @@ export default function ViewProfile() {
           {/* avatar + ally button */}
           <View style={styles.avatarRow}>
             <Image
-              source={{
-                uri: viewed.avatar ?? "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
-              }}
+              source={
+                viewed.avatar
+                ? { uri: viewed.avatar }
+                : require("@/assets/images/user.png")
+              }
               style={[styles.avatar, { borderColor: colors.bg.muted }]}
             />
             <AllyButton />

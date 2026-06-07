@@ -350,7 +350,7 @@ console.log(posts.length);
               source={
                 profile?.banner
                   ? { uri: profile.banner }
-                  : require("@/assets/images/tanjiro.png")
+                  : require("@/assets/images/banner.png")
               }
               style={{ flex: 1 }}
             />
@@ -388,10 +388,9 @@ console.log(posts.length);
                 ]}
               >
                 <Image
-                  source={{
-                    uri: profile?.avatar ??
-                      "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
-                  }}
+                  source={profile?.avatar == null
+                ? { uri: profile?.avatar }
+                : require("@/assets/images/user.png")}
                   style={[styles.avatar, { borderColor: BG }]}
                 />
                 {/* <View style={styles.avatarOverlay} pointerEvents="none">
