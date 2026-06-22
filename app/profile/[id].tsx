@@ -357,14 +357,13 @@ export default function ViewProfile() {
       return (
         <Pressable
           style={[styles.allyBtn, styles.allyBtnAccepted, { borderColor: BORDER, backgroundColor: SURFACE }]}
-          onPress={withdrawRequest}
+          // onPress={withdrawRequest}
           disabled={actionLoading}
         >
           {actionLoading
             ? <ActivityIndicator size="small" color={INK_MUT} />
             : <>
                 <Text style={[styles.allyBtnLabel, { color: INK_MUT }]}>ALLIED</Text>
-                <Text style={[styles.allyBtnSub,   { color: BORDER  }]}>tap to remove</Text>
               </>
           }
         </Pressable>

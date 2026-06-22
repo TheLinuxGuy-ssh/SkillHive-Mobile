@@ -25,7 +25,7 @@ export function useActiveRooms() {
     const { data, error } = await supabase
       .from("active_rooms")
       .select("*")
-      .order("started_at", { ascending: true });
+      .order("started_at", { ascending: false });
 
     if (!mounted.current) return;
     if (!error && data) setRooms(data as ActiveRoom[]);
@@ -34,10 +34,8 @@ export function useActiveRooms() {
 
   useEffect(() => {
     mounted.current = true;
-
-    // unique per mount so no stale channel collision
-    const channelName = `room_participants_changes_${Date.now()}`;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const channelName = `room_changes_${Date.now()}`;
+    let channels: ReturnType<typeof supabase.channel>[] = [];
     let poll: ReturnType<typeof setInterval> | null = null;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,23 +46,37 @@ export function useActiveRooms() {
 
       fetchRooms();
 
-      channel = supabase
-        .channel(channelName)
+      // Listen to room_participants changes
+      const participantsChannel = supabase
+        .channel(`${channelName}_participants`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "room_participants" },
-          () => { fetchRooms(); },
+          () => fetchRooms()
         )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            poll = setInterval(fetchRooms, 10000);
-          }
-        });
+        .subscribe();
+
+      channels.push(participantsChannel);
+
+      // ALSO listen to rooms table for new rooms or session starts
+      const roomsChannel = supabase
+        .channel(`${channelName}_rooms`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "rooms" },
+          () => fetchRooms()
+        )
+        .subscribe();
+
+      channels.push(roomsChannel);
+
+      // Fallback polling (more aggressive)
+      poll = setInterval(fetchRooms, 5000); // 5 seconds instead of 10
     });
 
     return () => {
       mounted.current = false;
-      if (channel) supabase.removeChannel(channel);
+      channels.forEach((ch) => supabase.removeChannel(ch));
       if (poll) clearInterval(poll);
     };
   }, []);

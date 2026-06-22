@@ -12,7 +12,8 @@ import { Heart, MessageCircle } from "lucide-react-native";
 type Props = {
   postId: string;
   likes: number;
-  comments: number;
+  comments?: number;
+  noborder?: boolean;
   /** Optional: called when the user taps the comment button */
   onCommentPress?: (postId: string) => void;
 };
@@ -25,6 +26,7 @@ export default function ActionRow({
   postId,
   likes,
   comments,
+  noborder,
   onCommentPress,
 }: Props) {
   const { colors, spacing, typography } = useTheme();
@@ -122,7 +124,7 @@ export default function ActionRow({
         alignItems: "center",
         paddingHorizontal: spacing.base,
         paddingVertical: spacing.sm,
-        borderTopWidth: 1,
+        borderTopWidth: noborder ? 0 : 1,
         borderTopColor: colors.border.subtle,
         gap: 4,
       }}
@@ -172,36 +174,6 @@ export default function ActionRow({
       </Pressable>
 
       {/* Comment button */}
-      <Pressable
-        onPress={() => onCommentPress?.(postId)}
-        hitSlop={8}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 6,
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          borderRadius: 999,
-          backgroundColor: pressed ? colors.surface.secondary : "transparent",
-        })}
-      >
-        <Text
-          style={{
-            fontSize: 15,
-            color: colors.text.tertiary,
-          }}
-        >
-          <MessageCircle size={16} color={colors.text.tertiary} />
-        </Text>
-        <Text
-          style={{
-            color: colors.text.tertiary,
-            fontSize: typography.bodySm.size,
-          }}
-        >
-          {comments > 0 ? comments : "Comment"}
-        </Text>
-      </Pressable>
     </View>
   );
 }

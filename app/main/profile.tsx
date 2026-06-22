@@ -348,9 +348,7 @@ console.log(posts.length);
           <Pressable style={styles.banner} onPress={() => pickAndUpload("banner")}>
             <ImageBackground
               source={
-                profile?.banner
-                  ? { uri: profile.banner }
-                  : require("@/assets/images/banner.png")
+                profile?.banner ? { uri: profile.banner } : require("@/assets/images/banner.png")
               }
               style={{ flex: 1 }}
             />
@@ -388,7 +386,7 @@ console.log(posts.length);
                 ]}
               >
                 <Image
-                  source={profile?.avatar == null
+                  source={profile?.avatar != null
                 ? { uri: profile?.avatar }
                 : require("@/assets/images/user.png")}
                   style={[styles.avatar, { borderColor: BG }]}
@@ -423,7 +421,7 @@ console.log(posts.length);
             {/* name + username */}
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: INK }]}>{profile?.displayname}</Text>
-              <Text style={[styles.username, { color: INK_MUT, fontFamily: MONO }]}>
+              <Text style={[styles.username, { color: INK_MUT, fontFamily: "SpaceMono" }]}>
                 [{profile?.username}]
               </Text>
             </View>
@@ -463,7 +461,7 @@ console.log(posts.length);
       )}
 
       {!hasMore && posts.length > 0 && (
-        <Text style={[styles.emptyText, { color: BORDER, fontFamily: MONO }]}>
+        <Text style={[styles.emptyText, { color: BORDER, fontFamily: "SpaceMono" }]}>
           {/* [ end of posts ] */}
         </Text>
       )}
@@ -491,7 +489,7 @@ console.log(posts.length);
               />
             </View>
 
-            <Text style={[styles.footerLine, { color: BORDER, fontFamily: MONO }]}>
+            <Text style={[styles.footerLine, { color: BORDER, fontFamily: "SpaceMono" }]}>
               © SkillHiive
             </Text>
           </Animated.View>

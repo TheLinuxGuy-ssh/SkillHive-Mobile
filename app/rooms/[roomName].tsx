@@ -232,15 +232,28 @@ export default function RoomScreen() {
       throw new Error("Camera/mic permissions denied");
   }
 
-  async function fetchToken() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("No active session");
-    const res  = await fetch(`${TOKEN_ENDPOINT}?room=${roomName}&username=${profile?.username}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
-    if (!res.ok) throw new Error(`Token server error: ${res.status}`);
-    const data = await res.json();
-    if (!data.token) throw new Error("No token received");
-    setToken(data.token);
-  }
+async function fetchToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("No active session");
+  if (!profile?.username) return;
+
+  // Safely construct and encode the query params
+  const params = new URLSearchParams({
+    room: roomName,
+    username: profile.username
+  });
+
+  const res = await fetch(`${TOKEN_ENDPOINT}?${params.toString()}`, { 
+    headers: { 
+      Authorization: `Bearer ${session.access_token}` 
+    } 
+  });
+  
+  if (!res.ok) throw new Error(`Token server error: ${res.status}`);
+  const data = await res.json();
+  setToken(data.token);
+}
+
 
   async function fetchCubicleToken(cubicleRoomName: string) {
     const { data: { session } } = await supabase.auth.getSession();

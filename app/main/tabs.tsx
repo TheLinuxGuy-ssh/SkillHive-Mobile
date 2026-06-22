@@ -147,7 +147,7 @@ export const LinkNav = ({ state, navigation, onScrollRef }: any) => {
       <View style={{ borderRadius: 30, overflow: "hidden" }}>
     {/* <BlurView style={{ borderRadius: 50 }} intensity={80}> */}
     <GlassView>
-      <View style={[styles.container, { backgroundColor: colors.bg.elevated, borderColor: colors.border.default }]}>
+      <View style={[styles.container, {  borderColor: colors.border.default }]}>
         <Animated.View style={[styles.pill, pillStyle, {    backgroundColor: colors.surface.skillhive,}]} />
 
         {tabs.map((tab, i) => {

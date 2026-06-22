@@ -18,6 +18,7 @@ export type Profile = {
   created_at: string;
   email: string;
 };
+
 type ProfileContextValue = {
   profile: Profile | null;
   loading: boolean;
@@ -36,6 +37,8 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isMounted = useRef(true);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
@@ -46,12 +49,27 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       if (event === "SIGNED_OUT") {
         setProfile(null);
         setError(null);
+        // Cleanup subscriptions on sign out
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
       }
     });
 
     return () => {
       isMounted.current = false;
       listener.subscription.unsubscribe();
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
     };
   }, []);
 
@@ -100,9 +118,47 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       }
     } else {
       setProfile({ ...data, email: user.email ?? "" });
+      // Setup real-time subscription AFTER profile loads
+      setupRealtimeSubscription(user.id);
     }
 
     setLoading(false);
+  };
+
+  const setupRealtimeSubscription = (userId: string) => {
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`profile_${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          if (isMounted.current) {
+            // Refetch to ensure we have latest data
+            load();
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Also set up polling as fallback (every 30s)
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = setInterval(() => {
+            if (isMounted.current) load();
+          }, 30000);
+        }
+      });
+
+    channelRef.current = channel;
   };
 
   const create = async (id: string, email: string) => {
@@ -110,7 +166,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       .from("profiles")
       .insert({ id, displayname: email.split("@")[0] })
       .select(
-        "id, username, avatar, banner, bio, displayname, created_at, followers, following",
+        "id, username, avatar, banner, bio, displayname, created_at",
       )
       .single();
 
@@ -122,6 +178,8 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setProfile({ ...data, email });
+    // Subscribe after profile is created
+    setupRealtimeSubscription(id);
   };
 
   const updateField = async (
@@ -142,8 +200,9 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
 
-    if (isMounted.current)
+    if (isMounted.current) {
       setProfile((prev) => (prev ? { ...prev, [key]: value } : prev));
+    }
 
     return true;
   };

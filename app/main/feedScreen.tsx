@@ -13,11 +13,12 @@ import {
 
 import OfferCard, { OfferCardData } from "@/components/ui/OfferCard";
 import ProjectCard, { ProjectCardData } from "@/components/ui/ProjectCard";
+import MediaCard, { MediaCardData } from "@/components/ui/MediaCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import ShareBar from "@/components/ui/ShareBar";
 import { useTheme } from "@/hooks/useTheme";
 import { supabase } from "@/lib/supabase";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 type RawPost = {
   id:             string;
@@ -111,6 +112,25 @@ function toProjectCardData(row: RawPost): ProjectCardData | null {
   };
 }
 
+function toMediaCardData(row: RawPost): MediaCardData | null {
+  const sortedImages = [...(row.post_images ?? [])].sort(
+    (a, b) => a.sort_order - b.sort_order
+  );
+  if (!sortedImages[0]) return null;
+  
+  return {
+    user_id:        row.profiles.id,
+    post_id:        row.id,
+    caption:        row.caption,
+    likes_count:    row.likes_count,
+    comments_count: row.comments_count,
+    created_at:     row.created_at,
+    cover_url:      sortedImages[0]?.url ?? null,
+    author_name:    row.profiles?.username ?? "Unknown",
+    author_avatar:  row.profiles?.avatar ?? null,
+  };
+}
+
 function toOfferCardData(row: RawPost): OfferCardData | null {
   const op = row.offer_posts;
   if (!op) return null;
@@ -148,17 +168,6 @@ export default function FeedScreen() {
   const [cursor,      setCursor]      = useState<string | null>(null);
 
   // ── Initial load / refresh ─────────────────────────────────────────────
-useEffect(() => {
-  console.log(
-    "Existing channels:",
-    supabase.getChannels().map((c) => ({
-      topic: c.topic,
-      state: c.state,
-    }))
-  );
-
-  // rest of effect...
-}, []);
   const fetchFeed = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else           setLoading(true);
@@ -179,7 +188,6 @@ useEffect(() => {
       return;
     }
 
-
     const rows = data ?? [];
     lastFetchedRef.current = Date.now();
     setPosts(rows);
@@ -190,34 +198,19 @@ useEffect(() => {
   }, []);
 
   // ── Keep ref to latest fetchFeed so realtime callback never goes stale ─
-const fetchFeedRef = useRef(fetchFeed);
-useEffect(() => {
-  fetchFeedRef.current = fetchFeed;
-}, [fetchFeed]);
-  // ── Load more ──────────────────────────────────────────────────────────
-// ── Realtime updates ────────────────────────────────────────────────────
+  const fetchFeedRef = useRef(fetchFeed);
+  useEffect(() => {
+    fetchFeedRef.current = fetchFeed;
+  }, [fetchFeed]);
 
-useEffect(() => {
-  const channel = supabase.channel("feed-realtime");
-
-  channel.on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "posts",
-    },
-    () => {
-      console.log("posts changed");
-    }
+  // ── Refresh feed when returning from post detail screen ────────────────
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeedRef.current(true);
+    }, [])
   );
 
-  // channel.subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
+  // ── Load more ──────────────────────────────────────────────────────────
   const fetchMore = useCallback(async () => {
     if (isFetchingMore.current || !hasMore || !cursor) return;
     isFetchingMore.current = true;
@@ -243,7 +236,6 @@ useEffect(() => {
   }, [cursor, hasMore]);
 
   // ── Scroll handler ─────────────────────────────────────────────────────
-
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     const scrolledTo    = layoutMeasurement.height + contentOffset.y;
@@ -251,8 +243,18 @@ useEffect(() => {
     if (scrolledTo >= eightyPercent) fetchMore();
   }
 
-  // ── Auto-refresh + app state ───────────────────────────────────────────
+  // ── Polling for new posts (production workaround) ──────────────────────
+  // Avoids Supabase real-time subscription issues
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      console.log("Polling for new posts...");
+      fetchFeedRef.current(true);
+    }, 30000); // Poll every 30 seconds
 
+    return () => clearInterval(pollInterval);
+  }, []);
+
+  // ── Auto-refresh + app state ───────────────────────────────────────────
   useEffect(() => {
     fetchFeed();
 
@@ -286,6 +288,17 @@ useEffect(() => {
           />
         );
       }
+      case "media": {
+        const data = toMediaCardData(row);
+        if (!data) return null;
+        return (
+          <MediaCard
+            key={row.id}
+            data={data}
+            onPress={(id) => router.push(`/post/${id}`)}
+          />
+        );
+      }
       case "offer": {
         const data = toOfferCardData(row);
         if (!data) return null;
@@ -310,7 +323,7 @@ useEffect(() => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        // onScroll={handleScroll}
+        onScroll={handleScroll}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import {
   ArrowLeft,
   Send,
@@ -246,6 +246,10 @@ export default function PostDetailScreen() {
   const [editDesc,    setEditDesc]    = useState("");
   const [saving,      setSaving]      = useState(false);
 
+  // ── refs for polling ──
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetchAllRef = useRef<typeof fetchAll | null>(null);
+
   const isOwner = !!currentUserId && !!post && post.user_id === currentUserId;
 
   const insets = useSafeAreaInsets();
@@ -292,7 +296,34 @@ export default function PostDetailScreen() {
     setRefreshing(false);
   }, [postId]);
 
+  // Keep ref up to date for polling
+  useEffect(() => {
+    fetchAllRef.current = fetchAll;
+  }, [fetchAll]);
+
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Comment polling (every 8 seconds) ──
+  useEffect(() => {
+    pollIntervalRef.current = setInterval(() => {
+      if (fetchAllRef.current) {
+        fetchAllRef.current(false);
+      }
+    }, 8000);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
+  // ── Refetch when screen comes into focus ──
+  useFocusEffect(
+    useCallback(() => {
+      if (fetchAllRef.current) {
+        fetchAllRef.current(true);
+      }
+    }, [])
+  );
 
   // ── submit comment ──
   async function submitComment() {
@@ -312,7 +343,9 @@ export default function PostDetailScreen() {
     if (!error) {
       setCommentText("");
       setReplyTo(null);
-      fetchAll(true);
+      if (fetchAllRef.current) {
+        await fetchAllRef.current(true);
+      }
       inputRef.current?.blur();
     }
     setSubmitting(false);
@@ -326,7 +359,9 @@ export default function PostDetailScreen() {
         text: "Delete", style: "destructive",
         onPress: async () => {
           await supabase.from("comments").delete().eq("id", id);
-          fetchAll(true);
+          if (fetchAllRef.current) {
+            await fetchAllRef.current(true);
+          }
         },
       },
     ]);
@@ -362,7 +397,9 @@ export default function PostDetailScreen() {
 
     setSaving(false);
     setEditing(false);
-    fetchAll(true);
+    if (fetchAllRef.current) {
+      await fetchAllRef.current(true);
+    }
   }
 
   // ─────────────────────────────────────────
@@ -597,7 +634,7 @@ export default function PostDetailScreen() {
           borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
           marginBottom: spacing.lg,
         }}>
-          <ActionRow postId={post.id} likes={post.likes_count} comments={post.comments_count} />
+          <ActionRow postId={post.id} likes={post.likes_count} noborder />
         </View>
 
         {/* ── Comments heading ── */}
