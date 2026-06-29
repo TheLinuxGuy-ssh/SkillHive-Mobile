@@ -1,17 +1,21 @@
 {
   "expo": {
-    "name": "SkillHive-mobile",
+    "name": "SkillHiive",
     "slug": "SkillHive-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/skillhive.png",
     "backgroundColor": "#000000",
-    "scheme": "skillhivemobile",
+    "scheme": "skillhive",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SkillHivemobile"
+      "bundleIdentifier": "com.anonymous.SkillHiive",
+      "bitcode": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,17 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.SkillHivemobile"
+      "package": "com.anonymous.SkillHiive",
+      "permissions": [
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
     "web": {
       "output": "static",
@@ -55,6 +69,7 @@
       "eas": {
         "projectId": "006303f3-cd89-4b17-80e6-49e888a743a7"
       }
-    }
+    },
+    "owner": "thelinuxguy-ssh"
   }
 }
